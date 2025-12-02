@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <h1 class="h2">Gestión de Usuarios</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalUsuario">
+        Nuevo Usuario
+    </button>
+</div>
+
+<!-- Mensajes de éxito/error -->
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Lista de Usuarios</h5>
+            </div>
+            <div class="card-body">
+                {% if usuarios %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Tipo</th>
+                                <th>Fecha Creación</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usuario in usuarios %}
+                            <tr>
+                                <td>{{ usuario.username }}</td>
+                                <td>{{ usuario.email }}</td>
+                                <td>
+                                    <span class="badge {% if usuario.tipo_usuario == 'administrador' %}bg-danger
+                                        {% elif usuario.tipo_usuario == 'supervisor' %}bg-warning
+                                        {% else %}bg-success{% endif %}">
+                                        {{ usuario.tipo_usuario }}
+                                    </span>
+                                </td>
+                                <td>{{ usuario.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>
+                                    <span class="badge {% if usuario.activo %}bg-success{% else %}bg-secondary{% endif %}">
+                                        {% if usuario.activo %}Activo{% else %}Inactivo{% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalEditarUsuario"
+                                            data-user-id="{{ usuario.id }}"
+                                            data-username="{{ usuario.username }}"
+                                            data-email="{{ usuario.email }}"
+                                            data-tipo="{{ usuario.tipo_usuario }}">
+                                        Editar
+                                    </button>
+                                    {% if usuario.id != current_user.id %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalEliminarUsuario"
+                                            data-user-id="{{ usuario.id }}"
+                                            data-username="{{ usuario.username }}">
+                                        Eliminar
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">No hay usuarios registrados.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo usuario -->
+<div class="modal fade" id="modalUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/usuarios">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Username *</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña *</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Usuario *</label>
+                        <select class="form-select" name="tipo_usuario" required>
+                            <option value="">Seleccionar tipo...</option>
+                            {% for tipo in tipos_usuario %}
+                            <option value="{{ tipo }}">{{ tipo|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar usuario -->
+<div class="modal fade" id="modalEditarUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="" id="formEditarUsuario">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Username *</label>
+                        <input type="text" class="form-control" name="username" required id="editUsername">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="email" required id="editEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nueva Contraseña (dejar vacío para no cambiar)</label>
+                        <input type="password" class="form-control" name="password">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Usuario *</label>
+                        <select class="form-select" name="tipo_usuario" required id="editTipoUsuario">
+                            <option value="">Seleccionar tipo...</option>
+                            {% for tipo in tipos_usuario %}
+                            <option value="{{ tipo }}">{{ tipo|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para eliminar usuario -->
+<div class="modal fade" id="modalEliminarUsuario" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="" id="formEliminarUsuario">
+                <div class="modal-body">
+                    <p>¿Está seguro que desea eliminar al usuario <strong id="userToDelete"></strong>?</p>
+                    <p class="text-danger">Esta acción no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal de edición
+    const modalEditar = document.getElementById('modalEditarUsuario');
+    modalEditar.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const userId = button.getAttribute('data-user-id');
+        const username = button.getAttribute('data-username');
+        const email = button.getAttribute('data-email');
+        const tipo = button.getAttribute('data-tipo');
+        
+        document.getElementById('editUsername').value = username;
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editTipoUsuario').value = tipo;
+        
+        document.getElementById('formEditarUsuario').action = `/usuarios/${userId}/editar`;
+    });
+    
+    // Modal de eliminación
+    const modalEliminar = document.getElementById('modalEliminarUsuario');
+    modalEliminar.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const userId = button.getAttribute('data-user-id');
+        const username = button.getAttribute('data-username');
+        
+        document.getElementById('userToDelete').textContent = username;
+        document.getElementById('formEliminarUsuario').action = `/usuarios/${userId}/eliminar`;
+    });
+});
+</script>
+{% endblock %}

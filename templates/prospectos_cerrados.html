@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Prospectos Cerrados - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <h1 class="h2">Historial de Prospectos Cerrados</h1>
+    <div>
+        <a href="/prospectos" class="btn btn-outline-primary">Volver a Prospectos Activos</a>
+    </div>
+</div>
+
+<!-- Mensajes de éxito/error -->
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Panel de Filtros Avanzados -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">Filtros de Búsqueda</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" action="/prospectos/cerrados" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Fecha Registro Desde</label>
+                <input type="text" class="form-control" name="fecha_registro_desde" 
+                       value="{{ filtros_activos.fecha_registro_desde or '' }}" 
+                       placeholder="dd/mm/aaaa">
+            </div>
+            
+            <div class="col-md-3">
+                <label class="form-label">Fecha Registro Hasta</label>
+                <input type="text" class="form-control" name="fecha_registro_hasta" 
+                       value="{{ filtros_activos.fecha_registro_hasta or '' }}" 
+                       placeholder="dd/mm/aaaa">
+            </div>
+            
+            <div class="col-md-3">
+                <label class="form-label">Fecha Cierre Desde</label>
+                <input type="text" class="form-control" name="fecha_cierre_desde" 
+                       value="{{ filtros_activos.fecha_cierre_desde or '' }}" 
+                       placeholder="dd/mm/aaaa">
+            </div>
+            
+            <div class="col-md-3">
+                <label class="form-label">Fecha Cierre Hasta</label>
+                <input type="text" class="form-control" name="fecha_cierre_hasta" 
+                       value="{{ filtros_activos.fecha_cierre_hasta or '' }}" 
+                       placeholder="dd/mm/aaaa">
+            </div>
+            
+            <div class="col-md-4">
+                <label class="form-label">Destino</label>
+                <input type="text" class="form-control" name="destino" 
+                       value="{{ filtros_activos.destino or '' }}" 
+                       placeholder="Buscar por destino...">
+            </div>
+            
+            {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
+            <div class="col-md-4">
+                <label class="form-label">Agente</label>
+                <select class="form-select" name="agente_asignado_id">
+                    <option value="todos">Todos los agentes</option>
+                    {% for agente in agentes %}
+                    <option value="{{ agente.id }}" 
+                            {% if filtros_activos.agente_asignado_id == agente.id|string %}selected{% endif %}>
+                        {{ agente.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <div class="col-12">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                    <a href="/prospectos/cerrados" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Limpiar
+                    </a>
+                    <span class="ms-auto text-muted small align-self-center">
+                        {{ prospectos|length }} prospecto(s) cerrado(s) encontrado(s)
+                    </span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Prospectos Cerrados</h5>
+                <div>
+                    <span class="badge bg-danger me-2">Perdidos: {{ prospectos|selectattr('estado', 'equalto', 'cerrado_perdido')|list|length }}</span>
+                    <span class="badge bg-success">Ganados: {{ prospectos|selectattr('estado', 'equalto', 'ganado')|list|length }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if prospectos %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Contacto</th>
+                                <th>Destino</th>
+                                <th>Fechas Viaje</th>
+                                <th>Agente</th>
+                                <th>Estado</th>
+                                <th>Fecha Registro</th>
+                                <th>Última Interacción</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prospecto in prospectos %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">
+                                        {% if prospecto.nombre and prospecto.apellido %}
+                                            {{ prospecto.nombre }} {{ prospecto.apellido }}
+                                        {% else %}
+                                            <span class="text-muted">No registrado</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">ID: {{ prospecto.id }}</small>
+                                    {% if prospecto.cliente_recurrente %}
+                                    <span class="badge bg-warning" title="Cliente recurrente">🔄</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        {% if prospecto.telefono %}
+                                        <small class="text-success">
+                                            📞 +{{ prospecto.indicativo_telefono }} {{ prospecto.telefono }}
+                                            <a href="/clientes/historial?telefono={{ prospecto.telefono }}" 
+                                            class="text-success ms-1" title="Ver historial completo del cliente">
+                                                📋</a>
+                                            {% if prospecto.get_whatsapp_link() != "#" %}
+                                            <a href="{{ prospecto.get_whatsapp_link() }}" target="_blank" class="text-success ms-1" title="Abrir WhatsApp">
+                                                💬
+                                            </a>
+                                            {% endif %}
+                                        </small>
+                                        {% else %}
+                                        <small class="text-muted">📞 N/A</small>
+                                        {% endif %}
+
+                                        {% if prospecto.telefono_secundario %}
+                                        <small class="text-info mt-1">
+                                            📱 +{{ prospecto.indicativo_telefono_secundario }} {{ prospecto.telefono_secundario }}
+                                            {% if prospecto.get_whatsapp_link(False) != "#" %}
+                                            <a href="{{ prospecto.get_whatsapp_link(False) }}" target="_blank" class="text-info ms-1" title="Abrir WhatsApp">
+                                                💬
+                                            </a>
+                                            {% endif %}
+                                        </small>
+                                        {% endif %}
+
+                                        {% if prospecto.correo_electronico %}
+                                        <small class="text-primary mt-1">📧 {{ prospecto.correo_electronico }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ prospecto.destino or 'N/A' }}</td>
+                                <td>
+                                    {% if prospecto.fecha_ida %}
+                                        {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}
+                                        {% if prospecto.fecha_vuelta %}
+                                            <br><small>al {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ prospecto.agente_asignado.username if prospecto.agente_asignado else 'Sin asignar' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge {% if prospecto.estado == 'ganado' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ prospecto.estado|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small>{{ prospecto.fecha_registro.strftime('%d/%m/%Y') }}</small>
+                                </td>
+                                <td>
+                                    {% if prospecto.interacciones %}
+                                        {% set ultima_interaccion = prospecto.interacciones[0] %}
+                                        <small>{{ ultima_interaccion.fecha_creacion.strftime('%d/%m/%Y') }}</small>
+                                        <br><small class="text-muted">{{ ultima_interaccion.tipo_interaccion|title }}</small>
+                                    {% else %}
+                                        <small class="text-muted">N/A</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="/prospectos/{{ prospecto.id }}/seguimiento" 
+                                           class="btn btn-outline-info" title="Ver historial">
+                                            📋
+                                        </a>
+                                        {% if current_user.tipo_usuario in ['administrador', 'supervisor'] or prospecto.agente_asignado_id == current_user.id %}
+                                        <form method="post" action="/prospectos/{{ prospecto.id }}/reactivar" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-warning" 
+                                                    title="Reactivar prospecto"
+                                                    onclick="return confirm('¿Está seguro de reactivar este prospecto?')">
+                                                🔄
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <div class="text-muted">
+                        <i class="fas fa-archive fa-3x mb-3"></i>
+                        <h5>No se encontraron prospectos cerrados</h5>
+                        <p>No hay prospectos en estado cerrado/perdido o ganado con los filtros aplicados</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<!-- ✅ AGREGAR DATEPICKER -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar datepicker para campos de fecha
+    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
+    
+    fechaInputs.forEach(input => {
+        flatpickr(input, {
+            dateFormat: "d/m/Y",
+            locale: "es",
+            allowInput: true,
+            disableMobile: true, // Para mejor experiencia en desktop
+            onChange: function(selectedDates, dateStr, instance) {
+                // Formatear automáticamente mientras se escribe
+                if (dateStr) {
+                    instance.setDate(dateStr, true, "d/m/Y");
+                }
+            }
+        });
+    });
+    
+    // Mostrar/ocultar campos de fecha personalizada
+    const selectPeriodo = document.getElementById('selectPeriodo');
+    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
+    const fechaFinGroup = document.getElementById('fechaFinGroup');
+    
+    if (selectPeriodo) {
+        selectPeriodo.addEventListener('change', function() {
+            if (this.value === 'personalizado') {
+                fechaInicioGroup.style.display = 'block';
+                fechaFinGroup.style.display = 'block';
+            } else {
+                fechaInicioGroup.style.display = 'none';
+                fechaFinGroup.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Formatear automáticamente las fechas mientras se escribe
+    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
+    
+    fechaInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2);
+            }
+            if (value.length >= 5) {
+                value = value.substring(0, 5) + '/' + value.substring(5, 9);
+            }
+            
+            e.target.value = value;
+        });
+    });
+});
+</script>
+
+<style>
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.7rem;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}Seguimiento - {{ prospecto.nombre }} {{ prospecto.apellido }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <div>
+        <h1 class="h2">Seguimiento de Prospecto</h1>
+        <h3 class="h5 text-muted">{{ prospecto.nombre }} {{ prospecto.apellido }}</h3>
+        <div class="d-flex gap-2 mt-2">
+            <span class="badge {% if prospecto.estado == 'nuevo' %}bg-secondary
+                {% elif prospecto.estado == 'en_seguimiento' %}bg-primary
+                {% elif prospecto.estado == 'cotizado' %}bg-warning
+                {% elif prospecto.estado == 'cerrado_perdido' %}bg-danger
+                {% else %}bg-success{% endif %}">
+                Estado: {{ prospecto.estado|replace('_', ' ')|title }}
+            </span>
+            <span class="badge bg-info">Tel: {{ prospecto.telefono }}</span>
+            <span class="badge bg-dark">Agente: {{ prospecto.agente_asignado.username }}</span>
+        </div>
+    </div>
+    <div>
+        <a href="/prospectos" class="btn btn-secondary">Volver a Prospectos</a>
+    </div>
+</div>
+
+<!-- Mensajes -->
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Panel de Interacciones -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Historial de Interacciones</h5>
+            </div>
+            <div class="card-body">
+                <!-- Formulario para nueva interacción -->
+                <div class="mb-4 p-3 border rounded bg-light">
+                    <h6>Registrar Nueva Interacción</h6>
+                    <form method="post" action="/prospectos/{{ prospecto.id }}/interaccion">
+                        <div class="mb-3">
+                            <label class="form-label">Descripción *</label>
+                            <textarea class="form-control" name="descripcion" rows="3" 
+                                      placeholder="Detalle de la interacción con el cliente..." required></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Tipo de Interacción</label>
+                                    <select class="form-select" name="tipo_interaccion">
+                                        <option value="llamada">📞 Llamada</option>
+                                        <option value="email">📧 Email</option>
+                                        <option value="reunion">👥 Reunión</option>
+                                        <option value="whatsapp">💬 WhatsApp</option>
+                                        <option value="general" selected>📝 General</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Cambiar Estado</label>
+                                    <select class="form-select" name="cambio_estado">
+                                        <option value="">-- Mantener estado actual --</option>
+                                        <option value="en_seguimiento">🔄 En Seguimiento</option>
+                                        <option value="cotizado">💰 Cotizado</option>
+                                        <option value="ganado">✅ Ganado</option>
+                                        <option value="cerrado_perdido">❌ Cerrar (Perdido)</option>
+                                    </select>
+                                    <small class="text-muted">* Requiere comentario si cierra como perdido</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Registrar Interacción</button>
+                    </form>
+                </div>
+
+                <!-- Lista de interacciones -->
+                <div class="interacciones-list">
+                    {% if prospecto.interacciones %}
+                        {% for interaccion in prospecto.interacciones %}
+                        <div class="interaccion-item mb-3 p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <strong class="me-2">{{ interaccion.usuario.username }}</strong>
+                                        <small class="text-muted me-2">
+                                            {{ interaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
+                                        </small>
+                                        <span class="badge bg-secondary">{{ interaccion.tipo_interaccion|title }}</span>
+                                    </div>
+                                    <p class="mb-1">{{ interaccion.descripcion }}</p>
+                                    
+                                    {% if interaccion.estado_anterior and interaccion.estado_nuevo %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <strong>Cambio de estado:</strong> 
+                                            {{ interaccion.estado_anterior|replace('_', ' ')|title }} 
+                                            → 
+                                            {{ interaccion.estado_nuevo|replace('_', ' ')|title }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted">No hay interacciones registradas.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Documentos y Información -->
+    <div class="col-md-4">
+        <!-- Panel de Subida de Documentos -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Documentos del Prospecto</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/prospectos/{{ prospecto.id }}/documento" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Subir Documento (PDF)</label>
+                        <input type="file" class="form-control" name="archivo" accept=".pdf" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Documento</label>
+                        <select class="form-select" name="tipo_documento">
+                            <option value="cotizacion">📄 Cotización</option>
+                            <option value="contrato">📑 Contrato</option>
+                            <option value="otro">📎 Otro</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Descripción (opcional)</label>
+                        <input type="text" class="form-control" name="descripcion" placeholder="Descripción del documento...">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100">Subir Documento</button>
+                </form>
+
+                <!-- Lista de documentos -->
+                <div class="mt-3">
+                    <h6>Documentos Subidos</h6>
+                    {% if prospecto.documentos %}
+                        {% for documento in prospecto.documentos %}
+                        <div class="documento-item p-2 border rounded mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="fw-bold">{{ documento.nombre_archivo }}</small>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ documento.tipo_documento|title }} - 
+                                        {{ documento.fecha_subida.strftime('%d/%m/%Y') }}
+                                    </small>
+                                </div>
+                                <a href="/{{ documento.ruta_archivo }}" target="_blank" 
+                                   class="btn btn-sm btn-outline-primary">📂</a>
+                            </div>
+                            {% if documento.descripcion %}
+                            <small class="text-muted">{{ documento.descripcion }}</small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted small">No hay documentos subidos.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Información del Prospecto -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Información del Cliente</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <strong>Email:</strong> 
+                    <span class="text-muted">{{ prospecto.correo_electronico or 'N/A' }}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>Origen:</strong> 
+                    <span class="text-muted">{{ prospecto.ciudad_origen or 'N/A' }}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>Destino:</strong> 
+                    <span class="text-muted">{{ prospecto.destino or 'N/A' }}</span>
+                </div>
+                <div class="mb-2">
+                    <strong>Fechas:</strong> 
+                    <span class="text-muted">
+                        {% if prospecto.fecha_ida %}
+                            {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}
+                            {% if prospecto.fecha_vuelta %}
+                                - {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}
+                            {% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="mb-2">
+                    <strong>Pasajeros:</strong> 
+                    <span class="text-muted">
+                        A:{{ prospecto.pasajeros_adultos }} 
+                        N:{{ prospecto.pasajeros_ninos }} 
+                        I:{{ prospecto.pasajeros_infantes }}
+                    </span>
+                </div>
+                <div class="mb-2">
+                    <strong>Medio de Ingreso:</strong> 
+                    <span class="text-muted">{{ prospecto.medio_ingreso.nombre }}</span>
+                </div>
+                {% if prospecto.observaciones %}
+                <div class="mt-3">
+                    <strong>Observaciones:</strong>
+                    <p class="text-muted small">{{ prospecto.observaciones }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- ✅ NUEVA SECCIÓN: Editar Información de Viaje -->
+    <div class="card mt-4" id="editar-viaje">
+            <div class="card-header">
+                <h6 class="card-title mb-0">✏️ Editar Información de Viaje</h6>
+            </div>
+            <div class="card-body">
+        <form method="post" action="/prospectos/{{ prospecto.id }}/actualizar-viaje">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="correo_electronico" 
+                               value="{{ prospecto.correo_electronico or '' }}" placeholder="Email del cliente">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Teléfono Secundario</label>
+                        <input type="text" class="form-control" name="telefono_secundario" 
+                               value="{{ prospecto.telefono_secundario or '' }}" placeholder="Teléfono adicional">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Ciudad de Origen</label>
+                        <input type="text" class="form-control" name="ciudad_origen" 
+                               value="{{ prospecto.ciudad_origen or '' }}" placeholder="Ciudad de origen">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Destino</label>
+                        <input type="text" class="form-control" name="destino" 
+                               value="{{ prospecto.destino or '' }}" placeholder="Destino del viaje">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Fecha Ida (dd/mm/aaaa)</label>
+                        <input type="text" class="form-control" name="fecha_ida" 
+                               value="{% if prospecto.fecha_ida %}{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}{% endif %}" 
+                               placeholder="dd/mm/aaaa">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Fecha Vuelta (dd/mm/aaaa)</label>
+                        <input type="text" class="form-control" name="fecha_vuelta" 
+                               value="{% if prospecto.fecha_vuelta %}{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}{% endif %}" 
+                               placeholder="dd/mm/aaaa">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Adultos</label>
+                        <input type="number" class="form-control" name="pasajeros_adultos" 
+                               value="{{ prospecto.pasajeros_adultos }}" min="1">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Niños</label>
+                        <input type="number" class="form-control" name="pasajeros_ninos" 
+                               value="{{ prospecto.pasajeros_ninos }}" min="0">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Infantes</label>
+                        <input type="number" class="form-control" name="pasajeros_infantes" 
+                               value="{{ prospecto.pasajeros_infantes }}" min="0">
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-warning">
+                <i class="fas fa-save"></i> Actualizar Información de Viaje
+            </button>
+        </form>
+    </div>
+</div>
+</div>
+<!-- ✅ AGREGAR DATEPICKER -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar datepicker para campos de fecha
+    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
+    
+    fechaInputs.forEach(input => {
+        flatpickr(input, {
+            dateFormat: "d/m/Y",
+            locale: "es",
+            allowInput: true,
+            disableMobile: true, // Para mejor experiencia en desktop
+            onChange: function(selectedDates, dateStr, instance) {
+                // Formatear automáticamente mientras se escribe
+                if (dateStr) {
+                    instance.setDate(dateStr, true, "d/m/Y");
+                }
+            }
+        });
+    });
+    
+    // Mostrar/ocultar campos de fecha personalizada
+    const selectPeriodo = document.getElementById('selectPeriodo');
+    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
+    const fechaFinGroup = document.getElementById('fechaFinGroup');
+    
+    if (selectPeriodo) {
+        selectPeriodo.addEventListener('change', function() {
+            if (this.value === 'personalizado') {
+                fechaInicioGroup.style.display = 'block';
+                fechaFinGroup.style.display = 'block';
+            } else {
+                fechaInicioGroup.style.display = 'none';
+                fechaFinGroup.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
+<style>
+.interaccion-item {
+    background-color: #f8f9fa;
+    border-left: 4px solid #007bff;
+}
+
+.interaccion-item:nth-child(even) {
+    background-color: #ffffff;
+}
+
+.documento-item {
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.7em;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar loading en formularios
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn && !submitBtn.disabled) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                submitBtn.disabled = true;
+                
+                // Restaurar después de 5 segundos por si hay error
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 5000);
+            }
+        });
+    });
+    
+    // Auto-formato de fechas
+    const fechaInputs = document.querySelectorAll('input[placeholder*="dd/mm/aaaa"]');
+    fechaInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2);
+            if (value.length >= 5) value = value.substring(0, 5) + '/' + value.substring(5, 9);
+            e.target.value = value;
+        });
+    });
+});
+</script>
+{% endblock %}

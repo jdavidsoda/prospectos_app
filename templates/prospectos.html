@@ -1,0 +1,1015 @@
+{% extends "base.html" %}
+
+{% block title %}Prospectos - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <h1 class="h2">Gestión de Prospectos</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProspecto">
+        Nuevo Prospecto
+    </button>
+</div>
+
+<!-- Mensajes de éxito/error -->
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Panel de Filtros Compacto -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" action="/prospectos" class="row g-2 align-items-center">
+            <!-- ✅ BÚSQUEDA GLOBAL COMPACTA -->
+            <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" name="busqueda_global" 
+                    value="{{ filtros_activos.busqueda_global or '' }}" 
+                    placeholder="🔍 Búsqueda global...">
+            </div>
+            
+            <div class="col-md-2">
+                <input type="text" class="form-control form-control-sm" name="destino" 
+                    value="{{ filtros_activos.destino or '' }}" 
+                    placeholder="🌍 Destino...">
+            </div>
+            
+            <div class="col-md-2">
+                <input type="text" class="form-control form-control-sm" name="telefono" 
+                    value="{{ filtros_activos.telefono or '' }}" 
+                    placeholder="📞 Teléfono...">
+            </div>
+            
+            <div class="col-md-2">
+                <select class="form-select form-select-sm" name="estado">
+                    <option value="todos">Todos los estados</option>
+                    <option value="nuevo" {% if filtros_activos.estado == 'nuevo' %}selected{% endif %}>Nuevo</option>
+                    <option value="en_seguimiento" {% if filtros_activos.estado == 'en_seguimiento' %}selected{% endif %}>En Seguimiento</option>
+                    <option value="cotizado" {% if filtros_activos.estado == 'cotizado' %}selected{% endif %}>Cotizado</option>
+                    <option value="cerrado_perdido" {% if filtros_activos.estado == 'cerrado_perdido' %}selected{% endif %}>Cerrado/Perdido</option>
+                    <option value="ganado" {% if filtros_activos.estado == 'ganado' %}selected{% endif %}>Venta/Ganado</option>
+                </select>
+            </div>
+
+            {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
+            <div class="col-md-2">
+                <select class="form-select form-select-sm" name="agente_asignado_id">
+                    <option value="todos">Todos los agentes</option>
+                    <option value="sin_asignar" {% if filtros_activos.agente_asignado_id == 'sin_asignar' %}selected{% endif %}>
+                        Sin asignar
+                    </option>
+                    {% for agente in agentes %}
+                    <option value="{{ agente.id }}" 
+                            {% if filtros_activos.agente_asignado_id == agente.id|string %}selected{% endif %}>
+                        {{ agente.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            
+            <div class="col-md-auto">
+                <a href="/prospectos" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+            
+            <div class="col-md-auto ms-auto">
+                <span class="text-muted small">
+                    {{ prospectos|length }} prospecto(s)
+                </span>
+            </div>
+        </form>
+
+        <!-- Mostrar filtros activos (más compacto) -->
+        {% if filtros_activos.destino or filtros_activos.telefono or filtros_activos.medio_ingreso_id != 'todos' or filtros_activos.agente_asignado_id != 'todos' or filtros_activos.estado != 'todos' or filtros_activos.busqueda_global %}
+            <div class="mt-2">
+                <small class="text-muted">Filtros:</small>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% if filtros_activos.busqueda_global %}
+                    <span class="badge bg-primary bg-opacity-25 text-dark">Búsqueda: "{{ filtros_activos.busqueda_global }}"</span>
+                    {% endif %}
+                    
+                    {% if filtros_activos.destino %}
+                    <span class="badge bg-info bg-opacity-25 text-dark">Destino: {{ filtros_activos.destino }}</span>
+                    {% endif %}
+                    
+                    {% if filtros_activos.telefono %}
+                    <span class="badge bg-info bg-opacity-25 text-dark">Tel: {{ filtros_activos.telefono }}</span>
+                    {% endif %}
+                    
+                    {% if filtros_activos.estado and filtros_activos.estado != 'todos' %}
+                    <span class="badge bg-info bg-opacity-25 text-dark">Estado: {{ filtros_activos.estado|replace('_', ' ')|title }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Lista de Prospectos</h5>
+                <span class="badge bg-primary">{{ prospectos|length }} prospectos</span>
+            </div>
+            <div class="card-body">
+                {% if prospectos %}
+                <div class="table-responsive" style="max-height: 65vh; font-size: 0.85rem;">
+                    <table class="table table-striped table-hover table-sm" style="font-size: 0.8rem;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Contacto</th>
+                                <th>Origen - Destino</th>
+                                <th>Fechas</th>
+                                <th>Pasajeros</th>
+                                <th>Medio</th>
+                                <th>Agente</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                                {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
+                                <th>Asignar</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prospecto in prospectos %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">
+                                        {% if prospecto.nombre and prospecto.apellido %}
+                                            {{ prospecto.nombre }} {{ prospecto.apellido }}
+                                        {% else %}
+                                            <span class="text-muted">No registrado</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">ID: {{ prospecto.id }}</small>
+                                    {% if prospecto.cliente_recurrente %}
+                                    <span class="badge bg-warning" title="Cliente recurrente">🔄</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        {% if prospecto.correo_electronico %}
+                                        <small class="text-primary text-truncate" style="max-width: 150px; font-size: 0.75rem;" 
+                                                title="{{ prospecto.correo_electronico }}">
+                                            📧 {{ prospecto.correo_electronico }}
+                                        </small>
+                                        {% else %}
+                                        <small class="text-muted" style="font-size: 0.75rem;">📧 N/A</small>
+                                        {% endif %}
+                                        
+                                        {% if prospecto.telefono %}
+                                        <small class="text-success mt-1" style="font-size: 0.8rem;">
+                                            📞 +{{ prospecto.indicativo_telefono }} {{ prospecto.telefono }}
+                                             <!-- ✅ CAMBIO: Enlace al historial del cliente -->
+                                            <a href="/clientes/historial?telefono={{ prospecto.telefono }}" 
+                                            class="text-success ms-1" title="Ver historial completo del cliente">
+                                                📋
+                                            </a>
+                                            {% if prospecto.get_whatsapp_link() != "#" %}
+                                            <a href="{{ prospecto.get_whatsapp_link() }}" target="_blank" class="text-success ms-1" title="Abrir WhatsApp">
+                                                💬
+                                            </a>
+                                            {% endif %}
+                                        </small>
+                                        {% else %}
+                                        <small class="text-muted" style="font-size: 0.8rem;">📞 N/A</small>
+                                        {% endif %}
+
+                                        {% if prospecto.telefono_secundario %}
+                                        <small class="text-info mt-1" style="font-size: 0.75rem;">
+                                            📱 +{{ prospecto.indicativo_telefono_secundario }} {{ prospecto.telefono_secundario }}
+                                            {% if prospecto.get_whatsapp_link(False) != "#" %}
+                                            <a href="{{ prospecto.get_whatsapp_link(False) }}" target="_blank" class="text-info ms-1" title="Abrir WhatsApp">
+                                                💬
+                                            </a>
+                                            {% endif %}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <small><strong>Origen:</strong> {{ prospecto.ciudad_origen or 'N/A' }}</small>
+                                        <small><strong>Destino:</strong> {{ prospecto.destino or 'N/A' }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        {% if prospecto.fecha_ida %}
+                                        <small><strong>Ida:</strong> {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}</small>
+                                        {% else %}
+                                        <small><strong>Ida:</strong> <span class="text-muted">N/A</span></small>
+                                        {% endif %}
+                                        
+                                        {% if prospecto.fecha_vuelta %}
+                                        <small><strong>Vuelta:</strong> {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}</small>
+                                        {% else %}
+                                        <small><strong>Vuelta:</strong> <span class="text-muted">N/A</span></small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="text-center">
+                                        <div class="fw-bold">{{ prospecto.pasajeros_adultos + prospecto.pasajeros_ninos + prospecto.pasajeros_infantes }}</div>
+                                        <small class="text-muted">
+                                            A:{{ prospecto.pasajeros_adultos }} 
+                                            N:{{ prospecto.pasajeros_ninos }} 
+                                            I:{{ prospecto.pasajeros_infantes }}
+                                        </small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ prospecto.medio_ingreso.nombre }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ prospecto.agente_asignado.username if prospecto.agente_asignado else 'Sin asignar' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge {% if prospecto.estado == 'nuevo' %}bg-secondary
+                                        {% elif prospecto.estado == 'en_seguimiento' %}bg-primary
+                                        {% elif prospecto.estado == 'cotizado' %}bg-warning
+                                        {% elif prospecto.estado == 'cerrado_perdido' %}bg-danger
+                                        {% else %}bg-success{% endif %}">
+                                        {{ prospecto.estado|replace('_', ' ')|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="/prospectos/{{ prospecto.id }}/seguimiento" 
+                                           class="btn btn-outline-info" title="Ver seguimiento">
+                                            📋
+                                        </a>
+                                        <button type="button" class="btn btn-outline-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEditarProspecto"
+                                                data-prospecto-id="{{ prospecto.id }}"
+                                                data-nombre="{{ prospecto.nombre or '' }}"
+                                                data-apellido="{{ prospecto.apellido or '' }}"
+                                                data-email="{{ prospecto.correo_electronico or '' }}"
+                                                data-telefono="{{ prospecto.telefono or '' }}"
+                                                data-indicativo-telefono="{{ prospecto.indicativo_telefono or '57' }}"
+                                                data-telefono-secundario="{{ prospecto.telefono_secundario or '' }}"
+                                                data-indicativo-telefono-secundario="{{ prospecto.indicativo_telefono_secundario or '57' }}"
+                                                data-ciudad-origen="{{ prospecto.ciudad_origen or '' }}"
+                                                data-destino="{{ prospecto.destino or '' }}"
+                                                data-fecha-ida="{% if prospecto.fecha_ida %}{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}{% endif %}"
+                                                data-fecha-vuelta="{% if prospecto.fecha_vuelta %}{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}{% endif %}"
+                                                data-pasajeros-adultos="{{ prospecto.pasajeros_adultos }}"
+                                                data-pasajeros-ninos="{{ prospecto.pasajeros_ninos }}"
+                                                data-pasajeros-infantes="{{ prospecto.pasajeros_infantes }}"
+                                                data-medio-ingreso="{{ prospecto.medio_ingreso_id }}"
+                                                data-observaciones="{{ prospecto.observaciones or '' }}"
+                                                title="Editar prospecto">
+                                            ✏️
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalEliminarProspecto"
+                                                data-prospecto-id="{{ prospecto.id }}"
+                                                data-prospecto-nombre="{% if prospecto.nombre %}{{ prospecto.nombre }} {{ prospecto.apellido }}{% else %}Prospecto sin nombre{% endif %}"
+                                                title="Eliminar prospecto">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </td>
+                                <!-- En la tabla, dentro del formulario de asignación -->
+                                    {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
+                                    <td>
+                                        <form action="/prospectos/{{ prospecto.id }}/asignar" method="post" class="d-inline">
+                                            <!-- ✅ PARÁMETROS PARA MANTENER TODOS LOS FILTROS -->
+                                            {% if filtros_activos.destino %}
+                                            <input type="hidden" name="destino" value="{{ filtros_activos.destino }}">
+                                            {% endif %}
+                                            {% if filtros_activos.telefono %}
+                                            <input type="hidden" name="telefono" value="{{ filtros_activos.telefono }}">
+                                            {% endif %}
+                                            {% if filtros_activos.medio_ingreso_id and filtros_activos.medio_ingreso_id != 'todos' %}
+                                            <input type="hidden" name="medio_ingreso_id" value="{{ filtros_activos.medio_ingreso_id }}">
+                                            {% endif %}
+                                            {% if filtros_activos.agente_asignado_id and filtros_activos.agente_asignado_id != 'todos' %}
+                                            <input type="hidden" name="agente_filtro_id" value="{{ filtros_activos.agente_asignado_id }}">
+                                            {% endif %}
+                                            {% if filtros_activos.estado and filtros_activos.estado != 'todos' %}
+                                            <input type="hidden" name="estado" value="{{ filtros_activos.estado }}">
+                                            {% endif %}
+                                            {% if filtros_activos.busqueda_global %}
+                                            <input type="hidden" name="busqueda_global" value="{{ filtros_activos.busqueda_global }}">
+                                            {% endif %}
+                                            
+                                            <select name="agente_id" class="form-select form-select-sm" 
+                                                    onchange="this.form.submit()" style="min-width: 120px;"
+                                                    title="Asignar agente a este prospecto">
+                                                <option value="0">Sin asignar</option>
+                                                {% for agente in agentes %}
+                                                <option value="{{ agente.id }}" {% if prospecto.agente_asignado_id == agente.id %}selected{% endif %}>
+                                                    {{ agente.username }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </form>
+                                    </td>
+                                    {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <div class="text-muted">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <h5>No se encontraron prospectos</h5>
+                        <p>
+                            {% if filtros_activos.destino or filtros_activos.telefono or filtros_activos.medio_ingreso_id != 'todos' or filtros_activos.agente_asignado_id != 'todos' or filtros_activos.estado != 'todos' %}
+                            Intenta ajustar los filtros de búsqueda
+                            {% else %}
+                            No hay prospectos registrados. <a href="#" data-bs-toggle="modal" data-bs-target="#modalProspecto">Crea el primero</a>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para nuevo prospecto -->
+<div class="modal fade" id="modalProspecto" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Prospecto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="/prospectos">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <small><strong>Nota:</strong> Solo los campos Teléfono y Medio de Ingreso son obligatorios.</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" name="nombre" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" name="apellido" placeholder="Opcional">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="correo_electronico" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <!-- ✅ TELÉFONOS EN UNA SOLA FILA COMPACTA -->
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Indicativo Principal *</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">+</span>
+                                        <input type="text" class="form-control" name="indicativo_telefono" 
+                                            placeholder="57" value="57" pattern="[0-9]{1,4}" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Teléfono Principal *</label>
+                                    <input type="tel" class="form-control form-control-sm" name="telefono" required 
+                                        placeholder="Ej: 3001234567">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Indicativo Secundario</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">+</span>
+                                        <input type="text" class="form-control" name="indicativo_telefono_secundario" 
+                                            placeholder="57" value="57" pattern="[0-9]{1,4}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Teléfono Secundario</label>
+                                    <input type="tel" class="form-control form-control-sm" name="telefono_secundario" 
+                                        placeholder="Opcional">
+                                </div>
+                            </div>
+                        </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Ciudad de Origen</label>
+                                <input type="text" class="form-control" name="ciudad_origen" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Destino</label>
+                                <input type="text" class="form-control" name="destino" id="destinoInput" 
+                                    placeholder="Empieza a escribir... (ej: Cancún, México)"
+                                    list="destinosSugeridos"
+                                    autocomplete="off">
+                                <datalist id="destinosSugeridos"></datalist>
+                                <small class="text-muted">
+                                    <i class="fas fa-lightbulb"></i> El sistema sugerirá destinos similares existentes
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Fecha Ida (dd/mm/aaaa)</label>
+                                <input type="text" class="form-control" name="fecha_ida" placeholder="dd/mm/aaaa (Opcional)">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Fecha Vuelta (dd/mm/aaaa)</label>
+                                <input type="text" class="form-control" name="fecha_vuelta" placeholder="dd/mm/aaaa (Opcional)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Adultos</label>
+                                <input type="number" class="form-control" name="pasajeros_adultos" value="1" min="1">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Niños</label>
+                                <input type="number" class="form-control" name="pasajeros_ninos" value="0" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Infantes</label>
+                                <input type="number" class="form-control" name="pasajeros_infantes" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Medio de Ingreso *</label>
+                        <select class="form-select" name="medio_ingreso_id" required>
+                            <option value="">Seleccionar medio...</option>
+                            {% for medio in medios_ingreso %}
+                            <option value="{{ medio.id }}">{{ medio.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <textarea class="form-control" name="observaciones" rows="3" placeholder="Opcional"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Prospecto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar prospecto -->
+<div class="modal fade" id="modalEditarProspecto" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Prospecto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="" id="formEditarProspecto">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <small><strong>Nota:</strong> Solo los campos Teléfono y Medio de Ingreso son obligatorios.</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" name="nombre" id="editNombre" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Apellido</label>
+                                <input type="text" class="form-control" name="apellido" id="editApellido" placeholder="Opcional">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="correo_electronico" id="editEmail" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Teléfono *</label>
+                                <input type="tel" class="form-control" name="telefono" id="editTelefono" required placeholder="Requerido">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ NUEVO: CAMPOS DE INDICATIVOS PARA EDICIÓN -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Indicativo Teléfono Principal *</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">+</span>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        class="form-control" 
+                                        name="indicativo_telefono" 
+                                        id="editIndicativoTelefono"
+                                        placeholder="57"
+                                        value="57" 
+                                        pattern="[0-9]{1,4}"
+                                        title="Solo números, máximo 4 dígitos"
+                                        required
+                                    >
+                                </div>
+                                <small class="form-text text-muted">Ejemplos: 57 (Colombia), 1 (USA/Canada), 34 (España)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Teléfono Secundario</label>
+                                <input type="tel" class="form-control" name="telefono_secundario" id="editTelefonoSecundario" placeholder="Opcional">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Indicativo Teléfono Secundario</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">+</span>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        class="form-control" 
+                                        name="indicativo_telefono_secundario" 
+                                        id="editIndicativoTelefonoSecundario"
+                                        placeholder="57"
+                                        value="57" 
+                                        pattern="[0-9]{1,4}"    
+                                        title="Solo números, máximo 4 dígitos"
+                                    >
+                                </div>
+                                <small class="form-text text-muted">Ejemplos: 57 (Colombia), 1 (USA/Canada), 34 (España)</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Ciudad de Origen</label>
+                                <input type="text" class="form-control" name="ciudad_origen" id="editCiudadOrigen" placeholder="Opcional">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Destino</label>
+                                <input type="text" class="form-control" name="destino" id="editDestino" 
+                                    placeholder="Empieza a escribir... (ej: Cancún, México)"
+                                    list="destinosSugeridosEdit"
+                                    autocomplete="off">
+                                <datalist id="destinosSugeridosEdit"></datalist>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Fecha Ida (dd/mm/aaaa)</label>
+                                <input type="text" class="form-control" name="fecha_ida" id="editFechaIda" placeholder="dd/mm/aaaa (Opcional)">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Fecha Vuelta (dd/mm/aaaa)</label>
+                                <input type="text" class="form-control" name="fecha_vuelta" id="editFechaVuelta" placeholder="dd/mm/aaaa (Opcional)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Adultos</label>
+                                <input type="number" class="form-control" name="pasajeros_adultos" id="editPasajerosAdultos" value="1" min="1">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Niños</label>
+                                <input type="number" class="form-control" name="pasajeros_ninos" id="editPasajerosNinos" value="0" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Infantes</label>
+                                <input type="number" class="form-control" name="pasajeros_infantes" id="editPasajerosInfantes" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Medio de Ingreso *</label>
+                        <select class="form-select" name="medio_ingreso_id" required id="editMedioIngreso">
+                            <option value="">Seleccionar medio...</option>
+                            {% for medio in medios_ingreso %}
+                            <option value="{{ medio.id }}">{{ medio.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <textarea class="form-control" name="observaciones" id="editObservaciones" rows="3" placeholder="Opcional"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar Prospecto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para eliminar prospecto -->
+<div class="modal fade" id="modalEliminarProspecto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Eliminar Prospecto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="" id="formEliminarProspecto">
+                <div class="modal-body">
+                    <p>¿Está seguro que desea eliminar el prospecto: <strong id="prospectoToDelete"></strong>?</p>
+                    <p class="text-danger">Esta acción no se puede deshacer.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar Prospecto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS y Font Awesome para íconos -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<script>
+// JavaScript para los filtros y mejoras de UX
+document.addEventListener('DOMContentLoaded', function() {
+    // Formatear automáticamente las fechas mientras se escribe
+    const fechaInputs = document.querySelectorAll('input[name="fecha_ida"], input[name="fecha_vuelta"]');
+    
+    fechaInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2);
+            }
+            if (value.length >= 5) {
+                value = value.substring(0, 5) + '/' + value.substring(5, 9);
+            }
+            
+            e.target.value = value;
+        });
+    });
+    
+    // Modal de edición
+    const modalEditar = document.getElementById('modalEditarProspecto');
+    modalEditar.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const prospectoId = button.getAttribute('data-prospecto-id');
+        
+        // Llenar los campos del formulario con los datos del prospecto
+        document.getElementById('editNombre').value = button.getAttribute('data-nombre') || '';
+        document.getElementById('editApellido').value = button.getAttribute('data-apellido') || '';
+        document.getElementById('editEmail').value = button.getAttribute('data-email') || '';
+        document.getElementById('editTelefono').value = button.getAttribute('data-telefono') || '';
+        document.getElementById('editIndicativoTelefono').value = button.getAttribute('data-indicativo-telefono') || '57';
+        document.getElementById('editTelefonoSecundario').value = button.getAttribute('data-telefono-secundario') || '';
+        document.getElementById('editIndicativoTelefonoSecundario').value = button.getAttribute('data-indicativo-telefono-secundario') || '57';
+        document.getElementById('editCiudadOrigen').value = button.getAttribute('data-ciudad-origen') || '';
+        document.getElementById('editDestino').value = button.getAttribute('data-destino') || '';
+        document.getElementById('editFechaIda').value = button.getAttribute('data-fecha-ida') || '';
+        document.getElementById('editFechaVuelta').value = button.getAttribute('data-fecha-vuelta') || '';
+        document.getElementById('editPasajerosAdultos').value = button.getAttribute('data-pasajeros-adultos');
+        document.getElementById('editPasajerosNinos').value = button.getAttribute('data-pasajeros-ninos');
+        document.getElementById('editPasajerosInfantes').value = button.getAttribute('data-pasajeros-infantes');
+        document.getElementById('editMedioIngreso').value = button.getAttribute('data-medio-ingreso');
+        document.getElementById('editObservaciones').value = button.getAttribute('data-observaciones') || '';
+        
+        // Actualizar la acción del formulario
+        document.getElementById('formEditarProspecto').action = `/prospectos/${prospectoId}/editar`;
+    });
+    
+    // Modal de eliminación
+    const modalEliminar = document.getElementById('modalEliminarProspecto');
+    modalEliminar.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const prospectoId = button.getAttribute('data-prospecto-id');
+        const prospectoNombre = button.getAttribute('data-prospecto-nombre');
+        
+        document.getElementById('prospectoToDelete').textContent = prospectoNombre;
+        document.getElementById('formEliminarProspecto').action = `/prospectos/${prospectoId}/eliminar`;
+    });
+    
+    // Auto-enfocar el primer campo de filtro
+    const primerFiltro = document.querySelector('input[name="destino"]');
+    if (primerFiltro && !primerFiltro.value) {
+        primerFiltro.focus();
+    }
+    
+    // Mostrar loading al enviar formularios de filtro
+    const formFiltros = document.querySelector('form[method="get"]');
+    if (formFiltros) {
+        formFiltros.addEventListener('submit', function() {
+            const btnBuscar = this.querySelector('button[type="submit"]');
+            if (btnBuscar) {
+                btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+                btnBuscar.disabled = true;
+            }
+        });
+    }
+});
+</script>
+
+<style>
+/* Estilos personalizados para mejorar la visualización */
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Mejorar la visualización de emails pequeños */
+.email-small {
+    font-size: 0.75rem;
+    max-width: 150px;
+}
+
+/* Badges para estados */
+.badge {
+    font-size: 0.7rem;
+}
+
+/* Estilos para los campos de indicativo */
+.input-group-text {
+    background-color: #f8f9fa;
+    border: 1px solid #ced4da;
+}
+</style>
+<!-- ✅ AGREGAR DATEPICKER -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar datepicker para campos de fecha
+    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
+    
+    fechaInputs.forEach(input => {
+        flatpickr(input, {
+            dateFormat: "d/m/Y",
+            locale: "es",
+            allowInput: true,
+            disableMobile: true, // Para mejor experiencia en desktop
+            onChange: function(selectedDates, dateStr, instance) {
+                // Formatear automáticamente mientras se escribe
+                if (dateStr) {
+                    instance.setDate(dateStr, true, "d/m/Y");
+                }
+            }
+        });
+    });
+    
+    // Mostrar/ocultar campos de fecha personalizada
+    const selectPeriodo = document.getElementById('selectPeriodo');
+    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
+    const fechaFinGroup = document.getElementById('fechaFinGroup');
+    
+    if (selectPeriodo) {
+        selectPeriodo.addEventListener('change', function() {
+            if (this.value === 'personalizado') {
+                fechaInicioGroup.style.display = 'block';
+                fechaFinGroup.style.display = 'block';
+            } else {
+                fechaInicioGroup.style.display = 'none';
+                fechaFinGroup.style.display = 'none';
+            }
+        });
+    }
+});
+</script>
+<script>
+// ✅ AUTOCOMPLETADO INTELIGENTE PARA DESTINOS
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar autocompletado para campos de destino
+    const destinoInput = document.getElementById('destinoInput');
+    const editDestinoInput = document.getElementById('editDestino');
+    const destinosSugeridos = document.getElementById('destinosSugeridos');
+    const destinosSugeridosEdit = document.getElementById('destinosSugeridosEdit');
+    
+    // Función para buscar sugerencias
+    async function buscarSugerenciasDestinos(termino, datalistElement) {
+        if (termino.length < 2) {
+            datalistElement.innerHTML = '';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/destinos/sugerencias?q=${encodeURIComponent(termino)}`);
+            const data = await response.json();
+            
+            // Limpiar sugerencias anteriores
+            datalistElement.innerHTML = '';
+            
+            // Agregar nuevas sugerencias
+            data.sugerencias.forEach(sugerencia => {
+                const option = document.createElement('option');
+                option.value = sugerencia;
+                datalistElement.appendChild(option);
+            });
+            
+        } catch (error) {
+            console.error('Error buscando sugerencias:', error);
+        }
+    }
+    
+    // Configurar eventos para el modal de nuevo
+    if (destinoInput) {
+        let timeoutId;
+        destinoInput.addEventListener('input', function(e) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                buscarSugerenciasDestinos(e.target.value, destinosSugeridos);
+            }, 300); // Debounce de 300ms
+        });
+        
+        // Sugerir al hacer focus
+        destinoInput.addEventListener('focus', function() {
+            if (this.value.length >= 2) {
+                buscarSugerenciasDestinos(this.value, destinosSugeridos);
+            }
+        });
+    }
+    
+    // Configurar eventos para el modal de edición
+    if (editDestinoInput) {
+        let timeoutIdEdit;
+        editDestinoInput.addEventListener('input', function(e) {
+            clearTimeout(timeoutIdEdit);
+            timeoutIdEdit = setTimeout(() => {
+                buscarSugerenciasDestinos(e.target.value, destinosSugeridosEdit);
+            }, 300);
+        });
+    }
+    
+    // ✅ FUNCIÓN PARA CAPITALIZAR DESTINOS AL SALIR DEL CAMPO
+    function capitalizarDestino(input) {
+        if (!input.value) return;
+        
+        // Capitalizar cada palabra
+        let palabras = input.value.split(',');
+        palabras = palabras.map((parte, index) => {
+            if (index === 0) {
+                // Para la primera parte (ciudad), capitalizar palabras específicas
+                return parte.trim()
+                    .toLowerCase()
+                    .split(' ')
+                    .map(palabra => {
+                        // Mantener abreviaturas en mayúsculas
+                        if (['puj', 'sdq', 'mex', 'usa', 'uk', 'uae'].includes(palabra.toLowerCase())) {
+                            return palabra.toUpperCase();
+                        }
+                        // Capitalizar palabras comunes
+                        return palabra.charAt(0).toUpperCase() + palabra.slice(1);
+                    })
+                    .join(' ');
+            } else {
+                // Para el país, solo capitalizar primera letra
+                return parte.trim().charAt(0).toUpperCase() + parte.trim().slice(1).toLowerCase();
+            }
+        });
+        
+        input.value = palabras.join(', ');
+    }
+    
+    // Aplicar capitalización al perder focus
+    if (destinoInput) {
+        destinoInput.addEventListener('blur', function() {
+            capitalizarDestino(this);
+        });
+    }
+    
+    if (editDestinoInput) {
+        editDestinoInput.addEventListener('blur', function() {
+            capitalizarDestino(this);
+        });
+    }
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar loading en formularios
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn && !submitBtn.disabled) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                submitBtn.disabled = true;
+                
+                // Restaurar después de 5 segundos por si hay error
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 5000);
+            }
+        });
+    });
+    
+    // Auto-formato de fechas
+    const fechaInputs = document.querySelectorAll('input[placeholder*="dd/mm/aaaa"]');
+    fechaInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2);
+            if (value.length >= 5) value = value.substring(0, 5) + '/' + value.substring(5, 9);
+            e.target.value = value;
+        });
+    });
+});
+</script>
+{% endblock %}

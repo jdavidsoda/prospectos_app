@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Cliente Existente - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h4 class="card-title mb-0">⚠️ Cliente Ya Existente</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5>Se encontró un cliente existente con el teléfono: <strong>{{ nuevos_datos.telefono }}</strong></h5>
+                    </div>
+
+                    <!-- Información del Cliente Existente -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6>📋 Cliente Existente (ID: {{ cliente_existente.id }})</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Nombre:</strong> {{ cliente_existente.nombre or 'N/A' }} {{ cliente_existente.apellido or '' }}</p>
+                                    <p><strong>Email:</strong> {{ cliente_existente.correo_electronico or 'N/A' }}</p>
+                                    <p><strong>Agente Asignado:</strong> 
+                                        {% if cliente_existente.agente_asignado %}
+                                            {{ cliente_existente.agente_asignado.username }}
+                                        {% else %}
+                                            <span class="text-danger">Sin asignar</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Estado Actual:</strong> 
+                                        <span class="badge bg-secondary">{{ cliente_existente.estado|replace('_', ' ')|title }}</span>
+                                    </p>
+                                    <p><strong>Interacciones Previas:</strong> {{ interacciones_previas }}</p>
+                                    <p><strong>Documentos:</strong> {{ documentos_previos }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6>🆕 Nuevo Registro</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Nombre:</strong> {{ nuevos_datos.nombre or 'N/A' }} {{ nuevos_datos.apellido or '' }}</p>
+                                    <p><strong>Email:</strong> {{ nuevos_datos.correo_electronico or 'N/A' }}</p>
+                                    <p><strong>Destino:</strong> {{ nuevos_datos.destino or 'N/A' }}</p>
+                                    <p><strong>Fechas:</strong> 
+                                        {% if nuevos_datos.fecha_ida %}
+                                            {{ nuevos_datos.fecha_ida }}
+                                            {% if nuevos_datos.fecha_vuelta %} - {{ nuevos_datos.fecha_vuelta }}{% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
+                                    
+                                    <!-- ✅ NUEVO: Seleccionar Agente -->
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>📌 Asignar a Agente:</strong></label>
+                                        <select class="form-select" name="agente_asignado_id" id="selectAgente">
+                                            <option value="">-- Seleccionar Agente --</option>
+                                            {% for agente in agentes %}
+                                            <option value="{{ agente.id }}">
+                                                {{ agente.username }}
+                                            </option>
+                                            {% endfor %}
+                                            <option value="0">Sin asignar</option>
+                                        </select>
+                                        <small class="text-muted">Opcional: Puede asignar un agente ahora</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Últimas Interacciones -->
+                    {% if ultimas_interacciones %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6>📝 Últimas Interacciones del Cliente</h6>
+                        </div>
+                        <div class="card-body">
+                            {% for interaccion in ultimas_interacciones %}
+                            <div class="border-bottom pb-2 mb-2">
+                                <small class="text-muted">{{ interaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</small>
+                                <p class="mb-1">{{ interaccion.descripcion }}</p>
+                                <small class="badge bg-secondary">{{ interaccion.tipo_interaccion|title }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Opciones -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form method="post" action="/prospectos" id="formNuevoProspecto">
+                                <!-- ✅ AGREGAR CAMPOS CON AGENTE -->
+                                <input type="hidden" name="forzar_nuevo" value="true">
+                                <input type="hidden" name="telefono" value="{{ nuevos_datos.telefono }}">
+                                <input type="hidden" name="indicativo_telefono" value="{{ nuevos_datos.indicativo_telefono or '57' }}">
+                                <input type="hidden" name="medio_ingreso_id" value="{{ nuevos_datos.medio_ingreso_id }}">
+                                
+                                <!-- ✅ AGENTE ASIGNADO (si se seleccionó) -->
+                                <input type="hidden" name="agente_asignado_id" id="inputAgenteId" value="">
+                                
+                                <!-- ✅ CAMPOS OPCIONALES -->
+                                <input type="hidden" name="nombre" value="{{ nuevos_datos.nombre or '' }}">
+                                <input type="hidden" name="apellido" value="{{ nuevos_datos.apellido or '' }}">
+                                <input type="hidden" name="correo_electronico" value="{{ nuevos_datos.correo_electronico or '' }}">
+                                <input type="hidden" name="ciudad_origen" value="{{ nuevos_datos.ciudad_origen or '' }}">
+                                <input type="hidden" name="destino" value="{{ nuevos_datos.destino or '' }}">
+                                <input type="hidden" name="fecha_ida" value="{{ nuevos_datos.fecha_ida or '' }}">
+                                <input type="hidden" name="fecha_vuelta" value="{{ nuevos_datos.fecha_vuelta or '' }}">
+                                <input type="hidden" name="pasajeros_adultos" value="{{ nuevos_datos.pasajeros_adultos }}">
+                                <input type="hidden" name="pasajeros_ninos" value="{{ nuevos_datos.pasajeros_ninos }}">
+                                <input type="hidden" name="pasajeros_infantes" value="{{ nuevos_datos.pasajeros_infantes }}">
+                                <input type="hidden" name="observaciones" value="{{ nuevos_datos.observaciones or '' }}">
+                                
+                                <button type="submit" class="btn btn-primary w-100 mb-2">
+                                    ✅ Registrar Como Nuevo Prospecto
+                                </button>
+                                <small class="text-muted">Se creará un nuevo registro para este viaje</small>
+                            </form>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <a href="/prospectos" class="btn btn-secondary w-100 mb-2">
+                                ❌ Cancelar
+                            </a>
+                            <small class="text-muted">Volver sin guardar</small>
+                        </div>
+                    </div>
+
+                    <!-- Enlace al cliente existente -->
+                    <div class="text-center mt-3">
+                        <a href="/prospectos/{{ cliente_existente.id }}/seguimiento" target="_blank" class="btn btn-outline-info btn-sm">
+                            📋 Ver Historial Completo del Cliente
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ✅ CAPTURAR SELECCIÓN DE AGENTE
+    const selectAgente = document.getElementById('selectAgente');
+    const inputAgenteId = document.getElementById('inputAgenteId');
+    const formNuevoProspecto = document.getElementById('formNuevoProspecto');
+    
+    // Actualizar input hidden con la selección del agente
+    selectAgente.addEventListener('change', function() {
+        inputAgenteId.value = this.value;
+    });
+    
+    // ✅ AGREGAR CAMPOS DE TELÉFONO SECUNDARIO AL FORMULARIO
+    // (Asegurarse de que se envíen todos los datos)
+    const telefonoSecundario = "{{ nuevos_datos.telefono_secundario or '' }}";
+    const indicativoSecundario = "{{ nuevos_datos.indicativo_telefono_secundario or '57' }}";
+    
+    if (telefonoSecundario) {
+        const inputTelefonoSecundario = document.createElement('input');
+        inputTelefonoSecundario.type = 'hidden';
+        inputTelefonoSecundario.name = 'telefono_secundario';
+        inputTelefonoSecundario.value = telefonoSecundario;
+        formNuevoProspecto.appendChild(inputTelefonoSecundario);
+        
+        const inputIndicativoSecundario = document.createElement('input');
+        inputIndicativoSecundario.type = 'hidden';
+        inputIndicativoSecundario.name = 'indicativo_telefono_secundario';
+        inputIndicativoSecundario.value = indicativoSecundario;
+        formNuevoProspecto.appendChild(inputIndicativoSecundario);
+    }
+});
+</script>
+
+<style>
+.form-select {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+</style>
