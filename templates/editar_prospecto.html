@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Prospecto - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">Editar Prospecto</h1>
+            <a href="/prospectos" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver a la lista
+            </a>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Información del Prospecto #{{ prospecto.id }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/prospectos/{{ prospecto.id }}/editar">
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Los campos marcados con asterisco (*) son obligatorios.
+                    </div>
+
+                    <!-- Datos Personales -->
+                    <h6 class="border-bottom pb-2 mb-3 text-muted">Datos Personales</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" class="form-control" name="nombre" value="{{ prospecto.nombre or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido</label>
+                            <input type="text" class="form-control" name="apellido"
+                                value="{{ prospecto.apellido or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Correo Electrónico</label>
+                            <input type="email" class="form-control" name="correo_electronico"
+                                value="{{ prospecto.correo_electronico or '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Información de Contacto -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4 text-muted">Información de Contacto</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Indicativo Principal *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">+</span>
+                                <input type="text" class="form-control" name="indicativo_telefono"
+                                    value="{{ prospecto.indicativo_telefono or '57' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Teléfono Principal *</label>
+                            <input type="tel" class="form-control" name="telefono"
+                                value="{{ prospecto.telefono or '' }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Indicativo Secundario</label>
+                            <div class="input-group">
+                                <span class="input-group-text">+</span>
+                                <input type="text" class="form-control" name="indicativo_telefono_secundario"
+                                    value="{{ prospecto.indicativo_telefono_secundario or '57' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Teléfono Secundario</label>
+                            <input type="tel" class="form-control" name="telefono_secundario"
+                                value="{{ prospecto.telefono_secundario or '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Datos del Viaje -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4 text-muted">Datos del Viaje</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Ciudad de Origen</label>
+                            <input type="text" class="form-control" name="ciudad_origen"
+                                value="{{ prospecto.ciudad_origen or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Destino</label>
+                            <input type="text" class="form-control" name="destino"
+                                value="{{ prospecto.destino or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha Ida</label>
+                            <input type="text" class="form-control datepicker" name="fecha_ida"
+                                value="{% if prospecto.fecha_ida %}{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}{% endif %}"
+                                placeholder="dd/mm/aaaa">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha Vuelta</label>
+                            <input type="text" class="form-control datepicker" name="fecha_vuelta"
+                                value="{% if prospecto.fecha_vuelta %}{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}{% endif %}"
+                                placeholder="dd/mm/aaaa">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Adultos</label>
+                            <input type="number" class="form-control" name="pasajeros_adultos"
+                                value="{{ prospecto.pasajeros_adultos }}" min="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Niños</label>
+                            <input type="number" class="form-control" name="pasajeros_ninos"
+                                value="{{ prospecto.pasajeros_ninos }}" min="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Infantes</label>
+                            <input type="number" class="form-control" name="pasajeros_infantes"
+                                value="{{ prospecto.pasajeros_infantes }}" min="0">
+                        </div>
+                    </div>
+
+                    <!-- Datos Adicionales -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4 text-muted">Datos Adicionales</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Medio de Ingreso *</label>
+                        <select class="form-select" name="medio_ingreso_id" required>
+                            <option value="">Seleccionar medio...</option>
+                            {% for medio in medios_ingreso %}
+                            <option value="{{ medio.id }}" {% if prospecto.medio_ingreso_id==medio.id %}selected{% endif
+                                %}>
+                                {{ medio.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Observaciones</label>
+                        <textarea class="form-control" name="observaciones"
+                            rows="4">{{ prospecto.observaciones or '' }}</textarea>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="/prospectos" class="btn btn-secondary me-md-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        flatpickr(".datepicker", {
+            dateFormat: "d/m/Y",
+            locale: "es",
+            allowInput: true
+        });
+    });
+</script>
+{% endblock %}

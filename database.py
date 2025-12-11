@@ -23,7 +23,7 @@ def get_db():
 def create_tables():
     """Crear todas las tablas en la base de datos"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Tablas creadas correctamente")
+    print("Tablas creadas correctamente")
 
 def reset_database():
     """Eliminar y recrear todas las tablas (solo para desarrollo)"""

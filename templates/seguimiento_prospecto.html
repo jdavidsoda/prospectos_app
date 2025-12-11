@@ -5,22 +5,30 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
     <div>
-        <h1 class="h2">Seguimiento de Prospecto</h1>
-        <h3 class="h5 text-muted">{{ prospecto.nombre }} {{ prospecto.apellido }}</h3>
-        <div class="d-flex gap-2 mt-2">
-            <span class="badge {% if prospecto.estado == 'nuevo' %}bg-secondary
-                {% elif prospecto.estado == 'en_seguimiento' %}bg-primary
-                {% elif prospecto.estado == 'cotizado' %}bg-warning
-                {% elif prospecto.estado == 'cerrado_perdido' %}bg-danger
-                {% else %}bg-success{% endif %}">
-                Estado: {{ prospecto.estado|replace('_', ' ')|title }}
+        <h1 class="h2 fw-bold text-dark mb-0">Seguimiento de Prospecto</h1>
+        <div class="d-flex align-items-center mt-2">
+            <h3 class="h5 text-muted mb-0 me-3">{{ prospecto.nombre }} {{ prospecto.apellido }}</h3>
+            <span class="badge rounded-pill {% if prospecto.estado == 'nuevo' %}bg-soft-secondary text-secondary
+                {% elif prospecto.estado == 'en_seguimiento' %}bg-soft-primary text-primary
+                {% elif prospecto.estado == 'cotizado' %}bg-soft-warning text-warning
+                {% elif prospecto.estado == 'cerrado_perdido' %}bg-soft-danger text-danger
+                {% else %}bg-soft-success text-success{% endif %} me-2">
+                {{ prospecto.estado|replace('_', ' ')|title }}
             </span>
-            <span class="badge bg-info">Tel: {{ prospecto.telefono }}</span>
-            <span class="badge bg-dark">Agente: {{ prospecto.agente_asignado.username }}</span>
+            <span class="badge rounded-pill bg-light text-dark border me-2">
+                <i class="fas fa-user-tie text-muted me-1"></i> {{ prospecto.agente_asignado.username }}
+            </span>
+            <span class="badge rounded-pill bg-soft-info text-info border">
+                ID Cliente: {{ prospecto.id_cliente or 'N/A' }}
+            </span>
+        </div>
+        <div class="mt-1 small text-muted">
+            <span class="me-2">ID Sistema: #{{ prospecto.id }}</span>
         </div>
     </div>
     <div>
-        <a href="/prospectos" class="btn btn-secondary">Volver a Prospectos</a>
+        <a href="/prospectos" class="btn btn-outline-secondary btn-sm rounded-pill"><i
+                class="fas fa-arrow-left me-1"></i> Volver</a>
     </div>
 </div>
 
@@ -42,26 +50,27 @@
 <div class="row">
     <!-- Panel de Interacciones -->
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Historial de Interacciones</h5>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold text-primary"><i class="fas fa-history me-2"></i>Historial de
+                    Interacciones</h5>
             </div>
             <div class="card-body">
                 <!-- Formulario para nueva interacción -->
-                <div class="mb-4 p-3 border rounded bg-light">
-                    <h6>Registrar Nueva Interacción</h6>
+                <div class="mb-4 p-3 border-0 bg-light rounded-3">
+                    <h6 class="fw-bold mb-3">Registrar Nueva Interacción</h6>
                     <form method="post" action="/prospectos/{{ prospecto.id }}/interaccion">
                         <div class="mb-3">
-                            <label class="form-label">Descripción *</label>
-                            <textarea class="form-control" name="descripcion" rows="3" 
-                                      placeholder="Detalle de la interacción con el cliente..." required></textarea>
+                            <label class="form-label small text-muted">Descripción *</label>
+                            <textarea class="form-control border-0 shadow-sm" name="descripcion" rows="3"
+                                placeholder="Detalle de la interacción con el cliente..." required></textarea>
                         </div>
-                        
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Tipo de Interacción</label>
-                                    <select class="form-select" name="tipo_interaccion">
+                                    <label class="form-label small text-muted">Tipo de Interacción</label>
+                                    <select class="form-select border-0 shadow-sm" name="tipo_interaccion">
                                         <option value="llamada">📞 Llamada</option>
                                         <option value="email">📧 Email</option>
                                         <option value="reunion">👥 Reunión</option>
@@ -72,57 +81,69 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Cambiar Estado</label>
-                                    <select class="form-select" name="cambio_estado">
+                                    <label class="form-label small text-muted">Cambiar Estado</label>
+                                    <select class="form-select border-0 shadow-sm" name="cambio_estado">
                                         <option value="">-- Mantener estado actual --</option>
                                         <option value="en_seguimiento">🔄 En Seguimiento</option>
                                         <option value="cotizado">💰 Cotizado</option>
                                         <option value="ganado">✅ Ganado</option>
                                         <option value="cerrado_perdido">❌ Cerrar (Perdido)</option>
                                     </select>
-                                    <small class="text-muted">* Requiere comentario si cierra como perdido</small>
                                 </div>
                             </div>
                         </div>
-                        
-                        <button type="submit" class="btn btn-primary">Registrar Interacción</button>
+
+                        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4">Registrar
+                            Interacción</button>
                     </form>
                 </div>
 
                 <!-- Lista de interacciones -->
                 <div class="interacciones-list">
                     {% if prospecto.interacciones %}
-                        {% for interaccion in prospecto.interacciones %}
-                        <div class="interaccion-item mb-3 p-3 border rounded">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="flex-grow-1">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <strong class="me-2">{{ interaccion.usuario.username }}</strong>
-                                        <small class="text-muted me-2">
-                                            {{ interaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
-                                        </small>
-                                        <span class="badge bg-secondary">{{ interaccion.tipo_interaccion|title }}</span>
+                    {% for interaccion in prospecto.interacciones %}
+                    <div class="interaccion-item mb-3 p-3 border-0 rounded-3 shadow-sm bg-white position-relative">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="icon-shape icon-xs bg-soft-primary text-primary rounded-circle me-2"
+                                        style="width: 24px; height: 24px;">
+                                        <i class="fas fa-user"></i>
                                     </div>
-                                    <p class="mb-1">{{ interaccion.descripcion }}</p>
-                                    
+                                    <strong class="me-2 text-dark">{{ interaccion.usuario.username }}</strong>
+                                    <small class="text-muted ms-auto">
+                                        {% if interaccion.id %}ID: #{{ interaccion.id }} &middot;{% endif %}
+                                        {{ interaccion.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
+                                    </small>
+                                </div>
+                                <div class="ps-4 ms-1 border-start border-2 border-light">
+                                    <p class="mb-1 text-muted">{{ interaccion.descripcion }}</p>
+                                    <span class="badge bg-light text-dark border">{{ interaccion.tipo_interaccion|title
+                                        }}</span>
+
                                     {% if interaccion.estado_anterior and interaccion.estado_nuevo %}
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <strong>Cambio de estado:</strong> 
-                                            {{ interaccion.estado_anterior|replace('_', ' ')|title }} 
-                                            → 
+                                    <div class="mt-2 text-xs">
+                                        <span class="badge bg-soft-secondary text-secondary">
+                                            {{ interaccion.estado_anterior|replace('_', ' ')|title }}
+                                        </span>
+                                        <i class="fas fa-arrow-right text-muted mx-1" style="font-size: 0.7rem;"></i>
+                                        <span class="badge bg-soft-info text-info">
                                             {{ interaccion.estado_nuevo|replace('_', ' ')|title }}
-                                        </small>
+                                        </span>
                                     </div>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
+                    </div>
+                    {% endfor %}
                     {% else %}
-                        <div class="text-center py-4">
-                            <p class="text-muted">No hay interacciones registradas.</p>
+                    <div class="text-center py-5">
+                        <div class="icon-shape icon-lg bg-soft-secondary text-secondary rounded-circle mb-3 mx-auto">
+                            <i class="far fa-comment-dots fa-2x"></i>
                         </div>
+                        <p class="text-muted">No hay interacciones registradas aún.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -132,356 +153,288 @@
     <!-- Panel de Documentos y Información -->
     <div class="col-md-4">
         <!-- Panel de Subida de Documentos -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Documentos del Prospecto</h6>
+        <div class="card mb-4 border-0 shadow-sm">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="card-title mb-0 fw-bold text-dark"><i
+                        class="fas fa-file-alt me-2 text-secondary"></i>Documentos</h6>
             </div>
             <div class="card-body">
                 <form method="post" action="/prospectos/{{ prospecto.id }}/documento" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label class="form-label">Subir Documento (PDF)</label>
-                        <input type="file" class="form-control" name="archivo" accept=".pdf" required>
+                        <label class="form-label small text-muted">Subir Documento (PDF)</label>
+                        <input type="file" class="form-control form-control-sm" name="archivo" accept=".pdf" required>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Tipo de Documento</label>
-                        <select class="form-select" name="tipo_documento">
+                        <label class="form-label small text-muted">Tipo</label>
+                        <select class="form-select form-select-sm" name="tipo_documento">
                             <option value="cotizacion">📄 Cotización</option>
                             <option value="contrato">📑 Contrato</option>
                             <option value="otro">📎 Otro</option>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label">Descripción (opcional)</label>
-                        <input type="text" class="form-control" name="descripcion" placeholder="Descripción del documento...">
+                        <input type="text" class="form-control form-control-sm" name="descripcion"
+                            placeholder="Descripción opcional...">
                     </div>
-                    
-                    <button type="submit" class="btn btn-success w-100">Subir Documento</button>
+
+                    <button type="submit" class="btn btn-success btn-sm w-100 rounded-pill"><i
+                            class="fas fa-upload me-1"></i> Subir</button>
                 </form>
 
                 <!-- Lista de documentos -->
-                <div class="mt-3">
-                    <h6>Documentos Subidos</h6>
+                <div class="mt-4">
+                    <h6 class="small text-muted fw-bold border-bottom pb-2 mb-3">Archivos Guardados</h6>
                     {% if prospecto.documentos %}
-                        {% for documento in prospecto.documentos %}
-                        <div class="documento-item p-2 border rounded mb-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <small class="fw-bold">{{ documento.nombre_archivo }}</small>
-                                    <br>
-                                    <small class="text-muted">
-                                        {{ documento.tipo_documento|title }} - 
-                                        {{ documento.fecha_subida.strftime('%d/%m/%Y') }}
-                                    </small>
-                                </div>
-                                <a href="/{{ documento.ruta_archivo }}" target="_blank" 
-                                   class="btn btn-sm btn-outline-primary">📂</a>
+                    {% for documento in prospecto.documentos %}
+                    <div class="documento-item p-2 border-0 bg-light rounded-3 mb-2 d-flex align-items-center">
+                        <div class="me-3 text-danger"><i class="fas fa-file-pdf"></i></div>
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <div class="fw-bold small text-truncate">{{ documento.nombre_archivo }}</div>
+                            <div class="text-muted text-xs">
+                                ID: DOC-{{ documento.id }} &middot; {{ documento.tipo_documento|title }} &middot; {{
+                                documento.fecha_subida.strftime('%d/%m') }}
                             </div>
-                            {% if documento.descripcion %}
-                            <small class="text-muted">{{ documento.descripcion }}</small>
-                            {% endif %}
                         </div>
-                        {% endfor %}
+                        <a href="/{{ documento.ruta_archivo }}" target="_blank"
+                            class="btn btn-sm btn-light text-primary rounded-circle"><i class="fas fa-download"></i></a>
+                    </div>
+                    {% endfor %}
                     {% else %}
-                        <p class="text-muted small">No hay documentos subidos.</p>
+                    <p class="text-muted small text-center">No hay documentos.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Información del Prospecto -->
-        <div class="card">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Información del Cliente</h6>
-            </div>
+        <div class="card border-0 shadow-sm border-top border-4 border-info">
             <div class="card-body">
+                <h6 class="card-title fw-bold text-dark mb-3">Información del Cliente</h6>
+
+                <div class="mb-3">
+                    <label class="small text-muted d-block">WhatsApp / Teléfono</label>
+                    <div class="d-flex align-items-center">
+                        <span class="fs-6 me-2">+{{ prospecto.indicativo_telefono }} {{ prospecto.telefono }}</span>
+                        <a href="https://wa.me/{{ prospecto.indicativo_telefono }}{{ prospecto.telefono }}"
+                            target="_blank" class="text-success"><i class="fab fa-whatsapp fa-lg"></i></a>
+                    </div>
+                </div>
+
                 <div class="mb-2">
-                    <strong>Email:</strong> 
-                    <span class="text-muted">{{ prospecto.correo_electronico or 'N/A' }}</span>
+                    <small class="text-muted d-block">Email</small>
+                    <span>{{ prospecto.correo_electronico or 'N/A' }}</span>
                 </div>
                 <div class="mb-2">
-                    <strong>Origen:</strong> 
-                    <span class="text-muted">{{ prospecto.ciudad_origen or 'N/A' }}</span>
+                    <small class="text-muted d-block">Origen - Destino</small>
+                    <span>{{ prospecto.ciudad_origen or 'N/A' }} <i
+                            class="fas fa-long-arrow-alt-right mx-1 text-muted"></i> {{ prospecto.destino or 'N/A'
+                        }}</span>
                 </div>
                 <div class="mb-2">
-                    <strong>Destino:</strong> 
-                    <span class="text-muted">{{ prospecto.destino or 'N/A' }}</span>
-                </div>
-                <div class="mb-2">
-                    <strong>Fechas:</strong> 
-                    <span class="text-muted">
+                    <small class="text-muted d-block">Fechas</small>
+                    <span>
                         {% if prospecto.fecha_ida %}
-                            {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}
-                            {% if prospecto.fecha_vuelta %}
-                                - {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}
-                            {% endif %}
+                        {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}
+                        {% if prospecto.fecha_vuelta %}
+                        - {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}
+                        {% endif %}
                         {% else %}
-                            N/A
+                        N/A
                         {% endif %}
                     </span>
                 </div>
                 <div class="mb-2">
-                    <strong>Pasajeros:</strong> 
-                    <span class="text-muted">
-                        A:{{ prospecto.pasajeros_adultos }} 
-                        N:{{ prospecto.pasajeros_ninos }} 
-                        I:{{ prospecto.pasajeros_infantes }}
+                    <small class="text-muted d-block">Pasajeros</small>
+                    <span>
+                        <i class="fas fa-user text-muted me-1"></i>{{ prospecto.pasajeros_adultos }}
+                        <i class="fas fa-child text-muted ms-2 me-1"></i>{{ prospecto.pasajeros_ninos }}
+                        <i class="fas fa-baby text-muted ms-2 me-1"></i>{{ prospecto.pasajeros_infantes }}
                     </span>
                 </div>
                 <div class="mb-2">
-                    <strong>Medio de Ingreso:</strong> 
-                    <span class="text-muted">{{ prospecto.medio_ingreso.nombre }}</span>
+                    <small class="text-muted d-block">Medio de Ingreso</small>
+                    <span class="badge bg-light text-dark border">{{ prospecto.medio_ingreso.nombre }}</span>
                 </div>
                 {% if prospecto.observaciones %}
-                <div class="mt-3">
+                <div class="mt-3 p-2 bg-light rounded small">
                     <strong>Observaciones:</strong>
-                    <p class="text-muted small">{{ prospecto.observaciones }}</p>
+                    <p class="text-muted mb-0">{{ prospecto.observaciones }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
     <!-- ✅ NUEVA SECCIÓN: Editar Información de Viaje -->
-    <div class="card mt-4" id="editar-viaje">
-            <div class="card-header">
-                <h6 class="card-title mb-0">✏️ Editar Información de Viaje</h6>
-            </div>
-            <div class="card-body">
-        <form method="post" action="/prospectos/{{ prospecto.id }}/actualizar-viaje">
-            <!-- Nombre y Apellido -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre</label>
-                        <input type="text" class="form-control" name="nombre" 
-                            value="{{ prospecto.nombre or '' }}" placeholder="Nombre del cliente">
+    <div class="card mt-4 border-0 shadow-sm" id="editar-viaje">
+        <div class="card-header">
+            <h6 class="card-title mb-0">✏️ Editar Información de Viaje</h6>
+        </div>
+        <div class="card-body">
+            <form method="post" action="/prospectos/{{ prospecto.id }}/actualizar-viaje">
+                <!-- Nombre y Apellido -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" class="form-control" name="nombre" value="{{ prospecto.nombre or '' }}"
+                                placeholder="Nombre del cliente">
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Apellido</label>
-                        <input type="text" class="form-control" name="apellido" 
-                            value="{{ prospecto.apellido or '' }}" placeholder="Apellido del cliente">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Email -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="correo_electronico" 
-                            value="{{ prospecto.correo_electronico or '' }}" placeholder="Email del cliente">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Teléfonos - Fila 1: Teléfono Principal -->
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label">Indicativo Principal</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">+</span>
-                            <input type="text" class="form-control" name="indicativo_telefono" 
-                                value="{{ prospecto.indicativo_telefono or '57' }}" 
-                                placeholder="57" pattern="[0-9]{1,4}">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Apellido</label>
+                            <input type="text" class="form-control" name="apellido"
+                                value="{{ prospecto.apellido or '' }}" placeholder="Apellido del cliente">
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label">Teléfono Principal</label>
-                        <input type="tel" class="form-control form-control-sm" name="telefono" 
-                            value="{{ prospecto.telefono or '' }}" placeholder="Ej: 3001234567">
-                    </div>
-                </div>
-                
-                <!-- Teléfono Secundario -->
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label">Indicativo Secundario</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text">+</span>
-                            <input type="text" class="form-control" name="indicativo_telefono_secundario" 
-                                value="{{ prospecto.indicativo_telefono_secundario or '57' }}" 
-                                placeholder="57" pattern="[0-9]{1,4}">
+
+                <!-- Email -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="correo_electronico"
+                                value="{{ prospecto.correo_electronico or '' }}" placeholder="Email del cliente">
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label">Teléfono Secundario</label>
-                        <input type="tel" class="form-control form-control-sm" name="telefono_secundario" 
-                            value="{{ prospecto.telefono_secundario or '' }}" placeholder="Teléfono adicional">
+
+                <!-- Teléfonos - Fila 1: Teléfono Principal -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Indicativo Principal</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">+</span>
+                                <input type="text" class="form-control" name="indicativo_telefono"
+                                    value="{{ prospecto.indicativo_telefono or '57' }}" placeholder="57"
+                                    pattern="[0-9]{1,4}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono Principal</label>
+                            <input type="tel" class="form-control form-control-sm" name="telefono"
+                                value="{{ prospecto.telefono or '' }}" placeholder="Ej: 3001234567">
+                        </div>
+                    </div>
+
+                    <!-- Teléfono Secundario -->
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Indicativo Secundario</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">+</span>
+                                <input type="text" class="form-control" name="indicativo_telefono_secundario"
+                                    value="{{ prospecto.indicativo_telefono_secundario or '57' }}" placeholder="57"
+                                    pattern="[0-9]{1,4}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono Secundario</label>
+                            <input type="tel" class="form-control form-control-sm" name="telefono_secundario"
+                                value="{{ prospecto.telefono_secundario or '' }}" placeholder="Teléfono adicional">
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Origen y Destino -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Ciudad de Origen</label>
-                        <input type="text" class="form-control" name="ciudad_origen" 
-                               value="{{ prospecto.ciudad_origen or '' }}" placeholder="Ciudad de origen">
+
+                <!-- Origen y Destino -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Ciudad de Origen</label>
+                            <input type="text" class="form-control" name="ciudad_origen"
+                                value="{{ prospecto.ciudad_origen or '' }}" placeholder="Ciudad de origen">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Destino</label>
+                            <input type="text" class="form-control" name="destino" value="{{ prospecto.destino or '' }}"
+                                placeholder="Destino del viaje">
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Destino</label>
-                        <input type="text" class="form-control" name="destino" 
-                               value="{{ prospecto.destino or '' }}" placeholder="Destino del viaje">
+
+                <!-- Fechas -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Fecha Ida (dd/mm/aaaa)</label>
+                            <input type="text" class="form-control date-picker-input" name="fecha_ida"
+                                value="{% if prospecto.fecha_ida %}{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}{% endif %}"
+                                placeholder="dd/mm/aaaa">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Fecha Vuelta (dd/mm/aaaa)</label>
+                            <input type="text" class="form-control date-picker-input" name="fecha_vuelta"
+                                value="{% if prospecto.fecha_vuelta %}{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}{% endif %}"
+                                placeholder="dd/mm/aaaa">
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Fechas -->
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Fecha Ida (dd/mm/aaaa)</label>
-                        <input type="text" class="form-control datepicker" name="fecha_ida" 
-                               value="{% if prospecto.fecha_ida %}{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}{% endif %}" 
-                               placeholder="dd/mm/aaaa">
+
+                <!-- Pasajeros -->
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Adultos</label>
+                            <input type="number" class="form-control" name="pasajeros_adultos"
+                                value="{{ prospecto.pasajeros_adultos or 1 }}" min="1">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Niños</label>
+                            <input type="number" class="form-control" name="pasajeros_ninos"
+                                value="{{ prospecto.pasajeros_ninos or 0 }}" min="0">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Infantes</label>
+                            <input type="number" class="form-control" name="pasajeros_infantes"
+                                value="{{ prospecto.pasajeros_infantes or 0 }}" min="0">
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Fecha Vuelta (dd/mm/aaaa)</label>
-                        <input type="text" class="form-control datepicker" name="fecha_vuelta" 
-                               value="{% if prospecto.fecha_vuelta %}{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}{% endif %}" 
-                               placeholder="dd/mm/aaaa">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Pasajeros -->
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="mb-3">
-                        <label class="form-label">Adultos</label>
-                        <input type="number" class="form-control" name="pasajeros_adultos" 
-                               value="{{ prospecto.pasajeros_adultos or 1 }}" min="1">
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="mb-3">
-                        <label class="form-label">Niños</label>
-                        <input type="number" class="form-control" name="pasajeros_ninos" 
-                               value="{{ prospecto.pasajeros_ninos or 0 }}" min="0">
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="mb-3">
-                        <label class="form-label">Infantes</label>
-                        <input type="number" class="form-control" name="pasajeros_infantes" 
-                               value="{{ prospecto.pasajeros_infantes or 0 }}" min="0">
-                    </div>
-                </div>
-            </div>
-                        
-            <button type="submit" class="btn btn-warning">
-                <i class="fas fa-save"></i> Actualizar Información de Viaje
-            </button>
-        </form>
+
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-save"></i> Actualizar Información de Viaje
+                </button>
+            </form>
+        </div>
     </div>
 </div>
-</div>
 <!-- ✅ AGREGAR DATEPICKER -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar datepicker para campos de fecha
-    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
-    
-    fechaInputs.forEach(input => {
-        flatpickr(input, {
-            dateFormat: "d/m/Y",
-            locale: "es",
-            allowInput: true,
-            disableMobile: true, // Para mejor experiencia en desktop
-            onChange: function(selectedDates, dateStr, instance) {
-                // Formatear automáticamente mientras se escribe
-                if (dateStr) {
-                    instance.setDate(dateStr, true, "d/m/Y");
+    document.addEventListener('DOMContentLoaded', function () {
+        // Mostrar loading en formularios
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function () {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn && !submitBtn.disabled) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                    submitBtn.disabled = true;
+
+                    // Restaurar después de 5 segundos por si hay error
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 5000);
                 }
-            }
+            });
         });
     });
-    
-    // Mostrar/ocultar campos de fecha personalizada
-    const selectPeriodo = document.getElementById('selectPeriodo');
-    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
-    const fechaFinGroup = document.getElementById('fechaFinGroup');
-    
-    if (selectPeriodo) {
-        selectPeriodo.addEventListener('change', function() {
-            if (this.value === 'personalizado') {
-                fechaInicioGroup.style.display = 'block';
-                fechaFinGroup.style.display = 'block';
-            } else {
-                fechaInicioGroup.style.display = 'none';
-                fechaFinGroup.style.display = 'none';
-            }
-        });
-    }
-});
-</script>
-<style>
-.interaccion-item {
-    background-color: #f8f9fa;
-    border-left: 4px solid #007bff;
-}
-
-.interaccion-item:nth-child(even) {
-    background-color: #ffffff;
-}
-
-.documento-item {
-    background-color: #f8f9fa;
-}
-
-.badge {
-    font-size: 0.7em;
-}
-</style>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Mostrar loading en formularios
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            if (submitBtn && !submitBtn.disabled) {
-                const originalText = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-                submitBtn.disabled = true;
-                
-                // Restaurar después de 5 segundos por si hay error
-                setTimeout(() => {
-                    submitBtn.innerHTML = originalText;
-                    submitBtn.disabled = false;
-                }, 5000);
-            }
-        });
-    });
-    
-    // Auto-formato de fechas
-    const fechaInputs = document.querySelectorAll('input[placeholder*="dd/mm/aaaa"]');
-    fechaInputs.forEach(input => {
-        input.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2);
-            if (value.length >= 5) value = value.substring(0, 5) + '/' + value.substring(5, 9);
-            e.target.value = value;
-        });
-    });
-});
 </script>
 {% endblock %}

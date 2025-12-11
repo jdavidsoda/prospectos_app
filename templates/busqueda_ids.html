@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Búsqueda por ID - Sistema de Prospectos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <h1 class="h2">Búsqueda Global por ID</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Parámetros de Búsqueda</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" action="/busqueda_ids" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Tipo de Identificador</label>
+                <select class="form-select" name="tipo_id">
+                    <option value="cliente" {% if tipo_id_activo=='cliente' %}selected{% endif %}>ID Cliente (CL-)
+                    </option>
+                    <option value="cotizacion" {% if tipo_id_activo=='cotizacion' %}selected{% endif %}>ID Cotización
+                        (COT-)</option>
+                    <option value="documento" {% if tipo_id_activo=='documento' %}selected{% endif %}>ID Documento
+                        (DOC-)</option>
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Valor del ID</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="valor_id" value="{{ valor_id_buscado or '' }}"
+                        placeholder="Ingrese el ID completo o parcial (ej: CL-2023...)" required>
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Buscar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if valor_id_buscado %}
+<div class="card">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Resultados: {{ tipo_busqueda }}</h5>
+        <span class="badge bg-primary">{{ resultados|length }} encontrados</span>
+    </div>
+    <div class="card-body">
+        {% if resultados %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID Cliente</th>
+                        <th>Nombre</th>
+                        <th>Contacto</th>
+                        <th>Destino</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prospecto in resultados %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-secondary font-monospace">{{ prospecto.id_cliente or 'N/A' }}</span>
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ prospecto.nombre }} {{ prospecto.apellido }}</div>
+                            <small class="text-muted">ID Sistema: {{ prospecto.id }}</small>
+                        </td>
+                        <td>
+                            <div><i class="fas fa-envelope text-muted me-1"></i> {{ prospecto.correo_electronico or
+                                'N/A' }}</div>
+                            <div><i class="fas fa-phone text-muted me-1"></i> +{{ prospecto.indicativo_telefono }} {{
+                                prospecto.telefono }}</div>
+                        </td>
+                        <td>{{ prospecto.destino or 'N/A' }}</td>
+                        <td>
+                            <span class="badge {% if prospecto.estado == 'nuevo' %}bg-secondary
+                                {% elif prospecto.estado == 'en_seguimiento' %}bg-primary
+                                {% elif prospecto.estado == 'cotizado' %}bg-warning
+                                {% elif prospecto.estado == 'cerrado_perdido' %}bg-danger
+                                {% else %}bg-success{% endif %}">
+                                {{ prospecto.estado|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/prospectos/{{ prospecto.id }}/seguimiento" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-eye"></i> Ver Detalle
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="text-muted">
+                <i class="fas fa-search-minus fa-3x mb-3"></i>
+                <h5>No se encontraron resultados</h5>
+                <p>Intente verificar el ID ingresado.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

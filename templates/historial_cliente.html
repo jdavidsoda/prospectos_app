@@ -8,194 +8,203 @@
     <a href="/prospectos" class="btn btn-secondary">Volver a Prospectos</a>
 </div>
 
-<!-- Buscador -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h6 class="card-title mb-0">Buscar Cliente por Teléfono</h6>
-    </div>
-    <div class="card-body">
-        <form method="get" action="/clientes/historial" class="row g-3">
-            <div class="col-md-8">
-                <label class="form-label">Teléfono</label>
-                <input type="text" class="form-control" name="telefono" 
-                       value="{{ telefono_buscado or '' }}" 
-                       placeholder="Ingrese teléfono principal o secundario..." required>
+<!-- Buscador Avanzado Compacto -->
+<div class="card mb-4 border-0 shadow-sm bg-light">
+    <div class="card-body py-3">
+        <form method="get" action="/clientes/historial" class="row row-cols-lg-auto g-2 align-items-center">
+            <div class="col-12">
+                <span class="fw-bold text-muted small me-2"><i class="fas fa-search"></i> Buscar Cliente</span>
             </div>
-            <div class="col-md-4 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-search"></i> Buscar Cliente
-                </button>
+
+            <div class="col-12">
+                <input type="text" class="form-control form-control-sm" name="busqueda"
+                    value="{{ busqueda_activa or '' }}" placeholder="Nombre, email o teléfono..."
+                    style="min-width: 250px;">
+            </div>
+
+            <div class="col-12">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0"><i
+                            class="far fa-calendar-alt text-muted"></i></span>
+                    <input type="text" class="form-control border-start-0 date-picker-input" name="fecha_busqueda"
+                        value="{{ fecha_activa or '' }}" placeholder="Fecha registro...">
+                </div>
+            </div>
+
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">Buscar</button>
+                <a href="/clientes/historial" class="btn btn-outline-secondary btn-sm rounded-circle" title="Limpiar"><i
+                        class="fas fa-times"></i></a>
             </div>
         </form>
     </div>
 </div>
 
-{% if telefono_buscado %}
-    {% if cliente %}
-        <!-- Información del Cliente -->
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="card-title mb-0">
-                    📋 Cliente: {{ cliente.nombre or 'N/A' }} {{ cliente.apellido or '' }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>📞 Teléfono Principal:</strong> {{ cliente.telefono }}</p>
-                        {% if cliente.telefono_secundario %}
-                        <p><strong>📱 Teléfono Secundario:</strong> {{ cliente.telefono_secundario }}</p>
-                        {% endif %}
-                        <p><strong>📧 Email:</strong> {{ cliente.correo_electronico or 'N/A' }}</p>
+{% if busqueda_activa or fecha_activa %}
+{% if cliente %}
+<!-- Información del Cliente -->
+<div class="card mb-4 border-0 shadow-sm border-start border-4 border-info">
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h5 class="card-title mb-0 text-dark fw-bold">
+                <i class="fas fa-user-circle text-info me-2"></i> {{ cliente.nombre or 'N/A' }} {{ cliente.apellido or
+                '' }}
+            </h5>
+            {% if cliente.cliente_recurrente %}
+            <span class="badge bg-soft-warning text-warning rounded-pill"><i class="fas fa-sync-alt me-1"></i> Cliente
+                Recurrente</span>
+            {% endif %}
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-shape icon-sm bg-soft-primary text-primary rounded-circle me-3">
+                        <i class="fas fa-phone"></i>
                     </div>
-                    <div class="col-md-6">
-                        <p><strong>📊 Total de Solicitudes:</strong> {{ prospectos|length }}</p>
-                        <p><strong>📍 Ciudad Origen:</strong> {{ cliente.ciudad_origen or 'N/A' }}</p>
-                        {% if cliente.cliente_recurrente %}
-                        <p><strong>🔄 Cliente Recurrente:</strong> <span class="badge bg-success">Sí</span></p>
-                        {% endif %}
+                    <div>
+                        <small class="text-muted d-block">Teléfono</small>
+                        <span class="fw-bold">{{ cliente.telefono }}</span>
+                    </div>
+                </div>
+            </div>
+            {% if cliente.telefono_secundario %}
+            <div class="col-md-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-shape icon-sm bg-soft-secondary text-secondary rounded-circle me-3">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Tel. Secundario</small>
+                        <span class="fw-bold">{{ cliente.telefono_secundario }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-md-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-shape icon-sm bg-soft-danger text-danger rounded-circle me-3">
+                        <i class="far fa-envelope"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Email</small>
+                        <span class="fw-bold text-truncate" style="max-width: 150px;"
+                            title="{{ cliente.correo_electronico }}">{{ cliente.correo_electronico or 'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-shape icon-sm bg-soft-success text-success rounded-circle me-3">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Origen</small>
+                        <span class="fw-bold">{{ cliente.ciudad_origen or 'N/A' }}</span>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- Lista de Prospectos/Solicitudes -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">📝 Historial de Solicitudes</h5>
-            </div>
-            <div class="card-body">
-                {% if prospectos %}
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Destino</th>
-                                <th>Fechas</th>
-                                <th>Estado</th>
-                                <th>Agente</th>
-                                <th>Fecha Registro</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for prospecto in prospectos %}
-                            <tr>
-                                <td>{{ prospecto.id }}</td>
-                                <td>{{ prospecto.destino or 'N/A' }}</td>
-                                <td>
-                                    {% if prospecto.fecha_ida %}
-                                        {{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}
-                                        {% if prospecto.fecha_vuelta %}
-                                            - {{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}
-                                        {% endif %}
-                                    {% else %}
-                                        N/A
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="badge {% if prospecto.estado == 'nuevo' %}bg-secondary
+<!-- Lista de Prospectos/Solicitudes -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 py-3">
+        <h5 class="card-title mb-0 fw-bold text-dark">📜 Historial de Solicitudes ({{ prospectos|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if prospectos %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-muted small">
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Destino</th>
+                        <th>Fechas de Viaje</th>
+                        <th>Estado</th>
+                        <th>Agente</th>
+                        <th>Fecha Registro</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prospecto in prospectos %}
+                    <tr>
+                        <td class="ps-4 fw-bold">#{{ prospecto.id }}</td>
+                        <td>{{ prospecto.destino or 'N/A' }}</td>
+                        <td>
+                            {% if prospecto.fecha_ida %}
+                            <small class="d-block">{{ prospecto.fecha_ida.strftime('%d/%m/%Y') }}</small>
+                            {% if prospecto.fecha_vuelta %}
+                            <small class="text-muted">{{ prospecto.fecha_vuelta.strftime('%d/%m/%Y') }}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted small">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill {% if prospecto.estado == 'nuevo' %}bg-secondary
                                         {% elif prospecto.estado == 'en_seguimiento' %}bg-primary
                                         {% elif prospecto.estado == 'cotizado' %}bg-warning
                                         {% elif prospecto.estado == 'cerrado_perdido' %}bg-danger
                                         {% else %}bg-success{% endif %}">
-                                        {{ prospecto.estado|replace('_', ' ')|title }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if prospecto.agente_asignado %}
-                                        {{ prospecto.agente_asignado.username }}
-                                    {% else %}
-                                        <span class="text-muted">Sin asignar</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ prospecto.fecha_registro.strftime('%d/%m/%Y') }}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="/prospectos/{{ prospecto.id }}/seguimiento" 
-                                           class="btn btn-outline-info" title="Ver seguimiento">
-                                            📋
-                                        </a>
-                                        {% if current_user.tipo_usuario in ['administrador', 'supervisor'] or prospecto.agente_asignado_id == current_user.id %}
-                                        <a href="/prospectos/{{ prospecto.id }}/seguimiento#editar-viaje" 
-                                           class="btn btn-outline-warning" title="Editar viaje">
-                                            ✏️
-                                        </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-4">
-                    <p class="text-muted">No se encontraron solicitudes para este cliente.</p>
-                </div>
-                {% endif %}
+                                {{ prospecto.estado|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if prospecto.agente_asignado %}
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape icon-xs bg-soft-primary text-primary rounded-circle me-2"
+                                    style="width: 24px; height: 24px;">
+                                    {{ prospecto.agente_asignado.username[:1].upper() }}
+                                </div>
+                                <small>{{ prospecto.agente_asignado.username }}</small>
+                            </div>
+                            {% else %}
+                            <span class="text-muted small">Sin asignar</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ prospecto.fecha_registro.strftime('%d/%m/%Y') }}</small></td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group btn-group-sm">
+                                <a href="/prospectos/{{ prospecto.id }}/seguimiento" class="btn btn-outline-info"
+                                    title="Ver seguimiento">
+                                    📋
+                                </a>
+                                {% if current_user.tipo_usuario in ['administrador', 'supervisor'] or
+                                prospecto.agente_asignado_id == current_user.id %}
+                                <a href="/prospectos/{{ prospecto.id }}/seguimiento#editar-viaje"
+                                    class="btn btn-outline-warning" title="Editar viaje">
+                                    ✏️
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="icon-shape icon-lg bg-soft-secondary text-secondary rounded-circle mb-3 mx-auto">
+                <i class="far fa-folder-open fa-2x"></i>
             </div>
+            <p class="text-muted mb-0">No se encontraron solicitudes para este cliente.</p>
         </div>
-    {% else %}
-        <!-- Cliente no encontrado -->
-        <div class="alert alert-warning text-center">
-            <h5>⚠️ Cliente No Encontrado</h5>
-            <p>No se encontró ningún cliente con el teléfono: <strong>{{ telefono_buscado }}</strong></p>
-            <a href="/prospectos" class="btn btn-primary">Crear Nuevo Prospecto</a>
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<!-- Cliente no encontrado -->
+<div class="alert alert-warning text-center">
+    <h5>⚠️ Cliente No Encontrado</h5>
+    <p>No se encontró ningún cliente con el término: <strong>{{ busqueda_activa or fecha_activa }}</strong></p>
+    <a href="/prospectos" class="btn btn-primary">Crear Nuevo Prospecto</a>
+</div>
+{% endif %}
 {% endif %}
 
-<style>
-.table td, .table th {
-    vertical-align: middle;
-}
-.badge {
-    font-size: 0.8rem;
-}
-</style>
-<!-- ✅ AGREGAR DATEPICKER -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar datepicker para campos de fecha
-    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
-    
-    fechaInputs.forEach(input => {
-        flatpickr(input, {
-            dateFormat: "d/m/Y",
-            locale: "es",
-            allowInput: true,
-            disableMobile: true, // Para mejor experiencia en desktop
-            onChange: function(selectedDates, dateStr, instance) {
-                // Formatear automáticamente mientras se escribe
-                if (dateStr) {
-                    instance.setDate(dateStr, true, "d/m/Y");
-                }
-            }
-        });
-    });
-    
-    // Mostrar/ocultar campos de fecha personalizada
-    const selectPeriodo = document.getElementById('selectPeriodo');
-    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
-    const fechaFinGroup = document.getElementById('fechaFinGroup');
-    
-    if (selectPeriodo) {
-        selectPeriodo.addEventListener('change', function() {
-            if (this.value === 'personalizado') {
-                fechaInicioGroup.style.display = 'block';
-                fechaFinGroup.style.display = 'block';
-            } else {
-                fechaInicioGroup.style.display = 'none';
-                fechaFinGroup.style.display = 'none';
-            }
-        });
-    }
-});
-</script>
+<!-- Cleaned scripts -->
 {% endblock %}

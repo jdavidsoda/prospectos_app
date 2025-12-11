@@ -17,12 +17,25 @@ import models
 import database
 import auth
 from models import TipoUsuario, EstadoProspecto
-from sqlalchemy import func, or_  #
+from sqlalchemy import func, or_, and_
 from difflib import get_close_matches
 import re
 
 
 
+
+def parsear_fecha(fecha_str: str) -> Optional[date]:
+    """Helper para parsear fechas en formatos DD/MM/YYYY o YYYY-MM-DD"""
+    if not fecha_str:
+        return None
+    try:
+        return datetime.strptime(fecha_str, "%d/%m/%Y").date()
+    except ValueError:
+        try:
+            return datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"⚠️ Error parseando fecha: {fecha_str}")
+            return None
 
 app = FastAPI(title="Sistema de Prospectos")
 
@@ -74,10 +87,10 @@ def startup():
             db.add(agente_user)
         
         db.commit()
-        print("✅ Datos iniciales creados correctamente")
-        print("👤 Usuario admin: admin / admin123")
-        print("👤 Usuario agente: agente1 / agente123")
-        print("📝 No se crearon prospectos de prueba. Puedes crearlos manualmente.")
+        print("Datos iniciales creados correctamente")
+        print("Usuario admin: admin / admin123")
+        print("Usuario agente: agente1 / agente123")
+        print("No se crearon prospectos de prueba. Puedes crearlos manualmente.")
         
     except Exception as e:
         db.rollback()
@@ -275,25 +288,27 @@ async def dashboard(
                 models.Prospecto.fecha_registro >= fecha_inicio_dt,
                 models.Prospecto.fecha_registro <= fecha_fin_dt
             ).count()
-            prospectos_seguimiento = db.query(models.Prospecto).filter(
-                models.Prospecto.estado == EstadoProspecto.EN_SEGUIMIENTO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            prospectos_seguimiento = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.EN_SEGUIMIENTO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
-            prospectos_cotizados = db.query(models.Prospecto).filter(
-                models.Prospecto.estado == EstadoProspecto.COTIZADO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            prospectos_cotizados = db.query(models.EstadisticaCotizacion).filter(
+                models.EstadisticaCotizacion.fecha_cotizacion >= fecha_inicio_obj,
+                models.EstadisticaCotizacion.fecha_cotizacion <= fecha_fin_obj
             ).count()
-            prospectos_ganados = db.query(models.Prospecto).filter(
-                models.Prospecto.estado == EstadoProspecto.GANADO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            prospectos_ganados = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.GANADO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
-            prospectos_perdidos = db.query(models.Prospecto).filter(
-                models.Prospecto.estado == EstadoProspecto.CERRADO_PERDIDO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            prospectos_perdidos = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.CERRADO_PERDIDO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
             
             print(f"📊 Estados - Nuevos: {prospectos_nuevos}, Seguimiento: {prospectos_seguimiento}, Cotizados: {prospectos_cotizados}, Ganados: {prospectos_ganados}, Perdidos: {prospectos_perdidos}")
@@ -314,16 +329,24 @@ async def dashboard(
                     models.Prospecto.fecha_registro <= fecha_fin_dt
                 ).count()
                 
-                ganados_agente = db.query(models.Prospecto).filter(
-                    models.Prospecto.agente_asignado_id == agente.id,
-                    models.Prospecto.estado == EstadoProspecto.GANADO.value,
-                    models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                    models.Prospecto.fecha_registro <= fecha_fin_dt
+                ganados_agente = db.query(models.HistorialEstado).filter(
+                    models.HistorialEstado.usuario_id == agente.id,
+                    models.HistorialEstado.estado_nuevo == EstadoProspecto.GANADO.value,
+                    models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                    models.HistorialEstado.fecha_cambio <= fecha_fin_dt
                 ).count()
                 
+                cotizados_agente = db.query(models.EstadisticaCotizacion).filter(
+                    models.EstadisticaCotizacion.agente_id == agente.id,
+                    models.EstadisticaCotizacion.fecha_cotizacion >= fecha_inicio_obj,
+                    models.EstadisticaCotizacion.fecha_cotizacion <= fecha_fin_obj
+                ).count()
+
                 conversion_agentes.append({
+                    'id': agente.id,
                     'username': agente.username,
                     'total_prospectos': total_agente,
+                    'cotizados': cotizados_agente,
                     'ganados': ganados_agente
                 })
             
@@ -378,11 +401,12 @@ async def dashboard(
             print(f"🌍 Destinos registrados agente: {destinos_count}")
             
             # Ventas del agente en el periodo
-            ventas_count = db.query(models.Prospecto).filter(
-                models.Prospecto.agente_asignado_id == user.id,
-                models.Prospecto.estado == EstadoProspecto.GANADO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            # Ventas del agente en el periodo (Basado en historial de cambios)
+            ventas_count = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.usuario_id == user.id,
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.GANADO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
             print(f"💰 Ventas agente: {ventas_count}")
             
@@ -409,29 +433,32 @@ async def dashboard(
                 models.Prospecto.fecha_registro >= fecha_inicio_dt,
                 models.Prospecto.fecha_registro <= fecha_fin_dt
             ).count()
-            prospectos_seguimiento = db.query(models.Prospecto).filter(
-                models.Prospecto.agente_asignado_id == user.id,
-                models.Prospecto.estado == EstadoProspecto.EN_SEGUIMIENTO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            prospectos_seguimiento = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.usuario_id == user.id,
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.EN_SEGUIMIENTO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
-            prospectos_cotizados = db.query(models.Prospecto).filter(
-                models.Prospecto.agente_asignado_id == user.id,
-                models.Prospecto.estado == EstadoProspecto.COTIZADO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            # Nota: Cotizados ya usa EstadisticaCotizacion (correcto)
+            prospectos_cotizados = db.query(models.EstadisticaCotizacion).filter(
+                models.EstadisticaCotizacion.agente_id == user.id,
+                models.EstadisticaCotizacion.fecha_cotizacion >= fecha_inicio_obj,
+                models.EstadisticaCotizacion.fecha_cotizacion <= fecha_fin_obj
             ).count()
-            prospectos_ganados = db.query(models.Prospecto).filter(
-                models.Prospecto.agente_asignado_id == user.id,
-                models.Prospecto.estado == EstadoProspecto.GANADO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            prospectos_ganados = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.usuario_id == user.id,
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.GANADO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
-            prospectos_perdidos = db.query(models.Prospecto).filter(
-                models.Prospecto.agente_asignado_id == user.id,
-                models.Prospecto.estado == EstadoProspecto.CERRADO_PERDIDO.value,
-                models.Prospecto.fecha_registro >= fecha_inicio_dt,
-                models.Prospecto.fecha_registro <= fecha_fin_dt
+            
+            prospectos_perdidos = db.query(models.HistorialEstado).filter(
+                models.HistorialEstado.usuario_id == user.id,
+                models.HistorialEstado.estado_nuevo == EstadoProspecto.CERRADO_PERDIDO.value,
+                models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+                models.HistorialEstado.fecha_cambio <= fecha_fin_dt
             ).count()
             
             print(f"📊 Estados agente - Nuevos: {prospectos_nuevos}, Seguimiento: {prospectos_seguimiento}, Cotizados: {prospectos_cotizados}, Ganados: {prospectos_ganados}, Perdidos: {prospectos_perdidos}")
@@ -488,33 +515,31 @@ def calcular_rango_fechas(periodo: str, fecha_inicio: str = None, fecha_fin: str
     """Calcula el rango de fechas según el periodo seleccionado"""
     hoy = date.today()
     
+    fecha_inicio_obj = hoy
+    fecha_fin_obj = hoy
+
     if periodo == "personalizado" and fecha_inicio and fecha_fin:
         # Usar fechas personalizadas
         try:
             fecha_inicio_obj = datetime.strptime(fecha_inicio, "%d/%m/%Y").date()
             fecha_fin_obj = datetime.strptime(fecha_fin, "%d/%m/%Y").date()
-            # Ajustar fecha_fin para incluir todo el día
-            fecha_fin_obj = datetime.combine(fecha_fin_obj, datetime.max.time()).date()
-            return fecha_inicio_obj, fecha_fin_obj
         except ValueError:
             # Si hay error en el formato, usar mes actual por defecto
             print("⚠️ Error en formato de fecha personalizada, usando mes actual")
             pass
     
-    if periodo == "dia":
+    elif periodo == "dia":
         # Hoy
         fecha_inicio_obj = hoy
-        fecha_fin_obj = datetime.combine(hoy, datetime.max.time()).date()
+        fecha_fin_obj = hoy
     elif periodo == "semana":
         # Esta semana (lunes a domingo)
         fecha_inicio_obj = hoy - timedelta(days=hoy.weekday())
         fecha_fin_obj = fecha_inicio_obj + timedelta(days=6)
-        fecha_fin_obj = datetime.combine(fecha_fin_obj, datetime.max.time()).date()
     elif periodo == "año":
         # Este año
         fecha_inicio_obj = date(hoy.year, 1, 1)
         fecha_fin_obj = date(hoy.year, 12, 31)
-        fecha_fin_obj = datetime.combine(fecha_fin_obj, datetime.max.time()).date()
     else:
         # Mes actual (por defecto)
         fecha_inicio_obj = date(hoy.year, hoy.month, 1)
@@ -522,9 +547,12 @@ def calcular_rango_fechas(periodo: str, fecha_inicio: str = None, fecha_fin: str
             fecha_fin_obj = date(hoy.year + 1, 1, 1) - timedelta(days=1)
         else:
             fecha_fin_obj = date(hoy.year, hoy.month + 1, 1) - timedelta(days=1)
-        fecha_fin_obj = datetime.combine(fecha_fin_obj, datetime.max.time()).date()
     
-    return fecha_inicio_obj, fecha_fin_obj
+    # Convertir a datetime con horas inicio/fin del día
+    fecha_inicio_dt = datetime.combine(fecha_inicio_obj, datetime.min.time())
+    fecha_fin_dt = datetime.combine(fecha_fin_obj, datetime.max.time())
+    
+    return fecha_inicio_dt, fecha_fin_dt
 
 
 
@@ -540,6 +568,8 @@ async def listar_prospectos(
     agente_asignado_id: str = Query(None),
     estado: str = Query(None),
     busqueda_global: str = Query(None),
+    page: int = Query(1, ge=1),  # ✅ Paginación: Página actual
+    limit: int = Query(10, ge=1, le=100),  # ✅ Paginación: Registros por página
     db: Session = Depends(database.get_db)
 ):
     user = await get_current_user(request, db)
@@ -555,27 +585,47 @@ async def listar_prospectos(
     else:
         query = db.query(models.Prospecto)
     
-    # ✅ LÓGICA CORREGIDA PARA FILTRO DE ESTADO
+    # ✅ LÓGICA DE FILTROS POR DEFECTO Y EXPLÍCITOS
+    filtros_aplicados = False
+
     if estado:
+        filtros_aplicados = True
         if estado == "todos":
-            # Mostrar todos los estados - no aplicar filtro adicional
             pass
         else:
-            # Filtrar por estado específico
             query = query.filter(models.Prospecto.estado == estado)
-    else:
-        # ✅ POR DEFECTO PARA AGENTES: Mostrar "En Seguimiento", "Cotizado" y "Nuevo"
+    
+    if agente_asignado_id:
+        filtros_aplicados = True
+        if agente_asignado_id == "todos":
+            pass
+        elif agente_asignado_id == "sin_asignar":
+            query = query.filter(models.Prospecto.agente_asignado_id == None)
+        else:
+            query = query.filter(models.Prospecto.agente_asignado_id == int(agente_asignado_id))
+
+    # ✅ APLICAR VALORES POR DEFECTO SI NO HAY ELEMENTOS DE FILTRO ESPECÍFICOS EN LA URL
+    # Se considera "filtro activo" si el usuario envió algún parámetro en la URL
+    # Pero para simplificar, si 'estado' y 'agente_asignado_id' son None, aplicamos defaults
+    
+    if estado is None and agente_asignado_id is None:
         if user.tipo_usuario == TipoUsuario.AGENTE.value:
+            # Agente: Nuevo, Seguimiento, Cotizado
             query = query.filter(models.Prospecto.estado.in_([
+                EstadoProspecto.NUEVO.value,
                 EstadoProspecto.EN_SEGUIMIENTO.value,
-                EstadoProspecto.COTIZADO.value,
-                EstadoProspecto.NUEVO.value
+                EstadoProspecto.COTIZADO.value
             ]))
         else:
-            # ✅ POR DEFECTO PARA ADMIN/SUPERVISOR: Solo mostrar prospectos "Nuevos"
+            # Admin/Supervisor: Nuevo Y Sin Asignar
             query = query.filter(models.Prospecto.estado == EstadoProspecto.NUEVO.value)
-    
-    # ✅ FILTRO DE BÚSQUEDA GLOBAL (INCLUYE TELÉFONO SECUNDARIO)
+            query = query.filter(models.Prospecto.agente_asignado_id == None)
+            
+            # Ajustar valores para que se reflejen en la vista
+            estado = EstadoProspecto.NUEVO.value
+            agente_asignado_id = "sin_asignar"
+
+    # ✅ FILTRO DE BÚSQUEDA GLOBAL
     if busqueda_global:
         search_term = f"%{busqueda_global}%"
         query = query.filter(
@@ -592,34 +642,37 @@ async def listar_prospectos(
         )
         print(f"🔍 Aplicando búsqueda global: {busqueda_global}")
     
-    # ✅ FILTRO POR TELÉFONO (INCLUYE PRINCIPAL Y SECUNDARIO)
+    # ✅ FILTRO POR TELÉFONO
     if telefono:
         telefono_term = f"%{telefono}%"
         query = query.filter(
             or_(
                 models.Prospecto.telefono.ilike(telefono_term),
-                # ✅ AGREGADO: Buscar en teléfono secundario
                 models.Prospecto.telefono_secundario.ilike(telefono_term)
             )
         )
-        print(f"📞 Aplicando filtro teléfono (incluye secundario): {telefono}")
     
-    # Aplicar filtros existentes
+    # Otros filtros
     if destino:
         query = query.filter(models.Prospecto.destino.ilike(f"%{destino}%"))
     
     if medio_ingreso_id and medio_ingreso_id != "todos":
         query = query.filter(models.Prospecto.medio_ingreso_id == int(medio_ingreso_id))
     
-    # Filtro por agente asignado
-    if agente_asignado_id and agente_asignado_id != "todos":
-        if agente_asignado_id == "sin_asignar":
-            query = query.filter(models.Prospecto.agente_asignado_id == None)
-        else:
-            query = query.filter(models.Prospecto.agente_asignado_id == int(agente_asignado_id))
+    # ✅ ORDENAMIENTO: Del más nuevo al más antiguo
+    # Se ordena después de todos los filtros y antes de la paginación
+    query = query.order_by(models.Prospecto.fecha_registro.desc())
     
-    # Obtener prospectos filtrados
-    prospectos = query.all()
+    # ✅ PAGINACIÓN
+    total_registros = query.count()
+    total_pages = (total_registros + limit - 1) // limit
+    
+    # Asegurar que la página solicitada sea válida
+    if page > total_pages and total_pages > 0:
+        page = total_pages
+    
+    offset = (page - 1) * limit
+    prospectos = query.offset(offset).limit(limit).all()
     
     # Obtener datos para filtros
     agentes = db.query(models.Usuario).filter(
@@ -640,9 +693,14 @@ async def listar_prospectos(
             "telefono": telefono,
             "medio_ingreso_id": medio_ingreso_id,
             "agente_asignado_id": agente_asignado_id,
-            "estado": estado,  # ✅ Ahora refleja correctamente el estado seleccionado
+            "estado": estado,
             "busqueda_global": busqueda_global
-        }
+        },
+        # Info Paginación
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+        "total_registros": total_registros
     })
 
 @app.post("/prospectos")
@@ -817,13 +875,8 @@ async def crear_prospecto(
                     break
 
         # ✅ CREAR NUEVO PROSPECTO CON INDICATIVOS Y DATOS MEJORADOS
-        fecha_ida_date = None
-        fecha_vuelta_date = None
-        
-        if fecha_ida:
-            fecha_ida_date = datetime.strptime(fecha_ida, "%d/%m/%Y").date()
-        if fecha_vuelta:
-            fecha_vuelta_date = datetime.strptime(fecha_vuelta, "%d/%m/%Y").date()
+        fecha_ida_date = parsear_fecha(fecha_ida)
+        fecha_vuelta_date = parsear_fecha(fecha_vuelta)
         
         # Determinar si es cliente recurrente
         cliente_recurrente = len(todos_clientes_existentes) > 0
@@ -960,13 +1013,8 @@ async def editar_prospecto(
             return RedirectResponse(url="/prospectos?error=No tiene permisos para editar este prospecto", status_code=303)
         
         # Convertir fechas de string a date
-        fecha_ida_date = None
-        fecha_vuelta_date = None
-        
-        if fecha_ida:
-            fecha_ida_date = datetime.strptime(fecha_ida, "%d/%m/%Y").date()
-        if fecha_vuelta:
-            fecha_vuelta_date = datetime.strptime(fecha_vuelta, "%d/%m/%Y").date()
+        fecha_ida_date = parsear_fecha(fecha_ida)
+        fecha_vuelta_date = parsear_fecha(fecha_vuelta)
         
         # Actualizar datos del prospecto
         prospecto.nombre = nombre
@@ -1233,7 +1281,7 @@ async def registrar_interaccion(
         
         db.add(interaccion)
         
-        # ✅ REGISTRAR ESTADÍSTICA DE COTIZACIÓN (solo primera vez)
+        # ✅ REGISTRAR ESTADÍSTICA DE COTIZACIÓN
         if (cambio_estado == EstadoProspecto.COTIZADO.value and 
             estado_anterior != EstadoProspecto.COTIZADO.value and
             prospecto.agente_asignado_id):
@@ -1243,13 +1291,20 @@ async def registrar_interaccion(
                 models.EstadisticaCotizacion.prospecto_id == prospecto_id
             ).first()
             
-            if not existe_estadistica:
+            if existe_estadistica:
+                # Actualizar la fecha si ya existe (para asegurar que cuenta HOY)
+                existe_estadistica.fecha_cotizacion = datetime.now().date()
+            else:
                 estadistica = models.EstadisticaCotizacion(
                     agente_id=prospecto.agente_asignado_id,
                     prospecto_id=prospecto_id,
                     fecha_cotizacion=datetime.now().date()
                 )
                 db.add(estadistica)
+                
+                # ✅ GENERAR ID DE COTIZACIÓN ÚNICO
+                db.flush()
+                estadistica.generar_id_cotizacion()
         
         # Actualizar estado del prospecto si hay cambio
         if cambio_estado:
@@ -1337,13 +1392,16 @@ async def subir_documento(
             estado_anterior = prospecto.estado
             prospecto.estado = EstadoProspecto.COTIZADO.value
             
-            # ✅ REGISTRAR ESTADÍSTICA DE COTIZACIÓN (solo primera vez)
+            # ✅ REGISTRAR ESTADÍSTICA DE COTIZACIÓN
             # Verificar si ya existe estadística para este prospecto
             existe_estadistica = db.query(models.EstadisticaCotizacion).filter(
                 models.EstadisticaCotizacion.prospecto_id == prospecto_id
             ).first()
             
-            if not existe_estadistica:
+            if existe_estadistica:
+                # Actualizar la fecha si ya existe
+                existe_estadistica.fecha_cotizacion = datetime.now().date()
+            else:
                 estadistica = models.EstadisticaCotizacion(
                     agente_id=prospecto.agente_asignado_id or user.id,
                     prospecto_id=prospecto_id,
@@ -1396,7 +1454,7 @@ async def subir_documento(
 
 
 # ✅ NUEVO ENDPOINT: Búsqueda por ID
-@app.get("/buscar", response_class=HTMLResponse)
+@app.get("/busqueda_ids", response_class=HTMLResponse)
 async def buscar_por_id(
     request: Request,
     tipo_id: str = Query("cliente"),  # cliente, cotizacion, documento
@@ -1592,6 +1650,8 @@ async def listar_prospectos_cerrados(
     fecha_cierre_hasta: str = Query(None),
     destino: str = Query(None),
     agente_asignado_id: str = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(database.get_db)
 ):
     user = await get_current_user(request, db)
@@ -1647,12 +1707,33 @@ async def listar_prospectos_cerrados(
     
     # Otros filtros
     if destino:
-        query = query.filter(models.Prospecto.destino.ilike(f"%{destino}%"))
+        # ✅ BÚSQUEDA GENERAL EN CERRADOS (Nombre, Email, Teléfono, Destino)
+        search_term = f"%{destino}%"
+        query = query.filter(or_(
+            models.Prospecto.destino.ilike(search_term),
+            models.Prospecto.nombre.ilike(search_term),
+            models.Prospecto.apellido.ilike(search_term),
+            models.Prospecto.correo_electronico.ilike(search_term),
+            models.Prospecto.telefono.ilike(search_term)
+        ))
     
     if agente_asignado_id and agente_asignado_id != "todos" and user.tipo_usuario in [TipoUsuario.ADMINISTRADOR.value, TipoUsuario.SUPERVISOR.value]:
         query = query.filter(models.Prospecto.agente_asignado_id == int(agente_asignado_id))
     
-    prospectos_cerrados = query.order_by(models.Prospecto.fecha_registro.desc()).all()
+    # ✅ PAGINACIÓN
+    query = query.order_by(models.Prospecto.fecha_registro.desc())
+    
+    total_registros = query.count()
+    total_pages = (total_registros + limit - 1) // limit
+    
+    # Asegurar que la página solicitada sea válida
+    if page > total_pages and total_pages > 0:
+        page = total_pages
+    if page < 1:
+        page = 1
+        
+    offset = (page - 1) * limit
+    prospectos_cerrados = query.offset(offset).limit(limit).all()
     
     # Obtener datos para filtros
     agentes = db.query(models.Usuario).filter(
@@ -1671,7 +1752,12 @@ async def listar_prospectos_cerrados(
             "fecha_cierre_hasta": fecha_cierre_hasta,
             "destino": destino,
             "agente_asignado_id": agente_asignado_id
-        }
+        },
+        # Info Paginación
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+        "total_registros": total_registros
     })
 
 @app.post("/prospectos/{prospecto_id}/reactivar")
@@ -1789,7 +1875,9 @@ async def exportar_prospectos_excel(
 @app.get("/clientes/historial", response_class=HTMLResponse)
 async def historial_cliente(
     request: Request,
+    busqueda: str = Query(None),
     telefono: str = Query(None),
+    fecha_busqueda: str = Query(None),
     db: Session = Depends(database.get_db)
 ):
     user = await get_current_user(request, db)
@@ -1799,25 +1887,58 @@ async def historial_cliente(
     cliente_principal = None
     prospectos = []
     
+    query = db.query(models.Prospecto)
+    
+    # ✅ LÓGICA DE BÚSQUEDA AVANZADA
+    filtros = []
+    
+    # 1. Búsqueda por término (Teléfono, Email, Nombre)
+    if busqueda:
+        term = f"%{busqueda}%"
+        filtros.append(or_(
+            models.Prospecto.telefono.ilike(term),
+            models.Prospecto.telefono_secundario.ilike(term),
+            models.Prospecto.correo_electronico.ilike(term),
+            models.Prospecto.nombre.ilike(term),
+            models.Prospecto.apellido.ilike(term)
+        ))
+    
+    # 2. Búsqueda por teléfono específico (compatibilidad anterior)
     if telefono:
-        # ✅ BÚSQUEDA MEJORADA - BUSCA EN AMBOS CAMPOS DE TELÉFONO
-        prospectos = db.query(models.Prospecto).filter(
-            or_(
-                models.Prospecto.telefono == telefono,
-                models.Prospecto.telefono_secundario == telefono
-            )
-        ).order_by(models.Prospecto.fecha_registro.desc()).all()
+        filtros.append(or_(
+            models.Prospecto.telefono == telefono,
+            models.Prospecto.telefono_secundario == telefono
+        ))
+        
+    # 3. Búsqueda por fecha exacta
+    if fecha_busqueda:
+        try:
+            fecha_dt = datetime.strptime(fecha_busqueda, "%d/%m/%Y").date()
+            # FIltrar por rango del día completo
+            fecha_inicio = datetime.combine(fecha_dt, datetime.min.time())
+            fecha_fin = datetime.combine(fecha_dt, datetime.max.time())
+            filtros.append(and_(
+                models.Prospecto.fecha_registro >= fecha_inicio,
+                models.Prospecto.fecha_registro <= fecha_fin
+            ))
+        except ValueError:
+            pass
+
+    if filtros:
+        query = query.filter(and_(*filtros))
+        prospectos = query.order_by(models.Prospecto.fecha_registro.desc()).all()
         
         if prospectos:
-            cliente_principal = prospectos[0]  # El más reciente como principal
-            print(f"🔍 Encontrados {len(prospectos)} prospectos para teléfono: {telefono}")
+            cliente_principal = prospectos[0]
+            print(f"🔍 Encontrados {len(prospectos)} registros en historial")
     
     return templates.TemplateResponse("historial_cliente.html", {
         "request": request,
         "current_user": user,
         "cliente": cliente_principal,
         "prospectos": prospectos,
-        "telefono_buscado": telefono
+        "busqueda_activa": busqueda or telefono,
+        "fecha_activa": fecha_busqueda
     })
 
 # ✅ ACTUALIZAR INFORMACIÓN DE VIAJE
@@ -1862,13 +1983,8 @@ async def actualizar_viaje(
             )
         
         # Convertir fechas
-        fecha_ida_date = None
-        fecha_vuelta_date = None
-        
-        if fecha_ida:
-            fecha_ida_date = datetime.strptime(fecha_ida, "%d/%m/%Y").date()
-        if fecha_vuelta:
-            fecha_vuelta_date = datetime.strptime(fecha_vuelta, "%d/%m/%Y").date()
+        fecha_ida_date = parsear_fecha(fecha_ida)
+        fecha_vuelta_date = parsear_fecha(fecha_vuelta)
         
         # Actualizar información
         prospecto.nombre = nombre
@@ -1944,6 +2060,7 @@ async def prospectos_filtro_dashboard(
     fecha_fin: str = Query(None),
     periodo: str = Query("mes"),
     pagina: int = Query(1),
+    agente_asignado_id: str = Query(None), # ✅ Nuevo filtro por agente
     db: Session = Depends(database.get_db)
 ):
     user = await get_current_user(request, db)
@@ -1954,31 +2071,82 @@ async def prospectos_filtro_dashboard(
     registros_por_pagina = 50
     offset = (pagina - 1) * registros_por_pagina
     
-    # ✅ CALCULAR RANGO DE FECHAS
-    fecha_inicio_obj, fecha_fin_obj = calcular_rango_fechas(periodo, fecha_inicio, fecha_fin)
-    fecha_inicio_dt = datetime.combine(fecha_inicio_obj, datetime.min.time())
-    fecha_fin_dt = datetime.combine(fecha_fin_obj, datetime.max.time())
+    # ✅ CALCULAR RANGO DE FECHAS (Ya devuelve datetimes con hora min/max)
+    fecha_inicio_dt, fecha_fin_dt = calcular_rango_fechas(periodo, fecha_inicio, fecha_fin)
     
-    # Construir query base según permisos
-    if user.tipo_usuario == TipoUsuario.AGENTE.value:
-        query = db.query(models.Prospecto).filter(
-            models.Prospecto.agente_asignado_id == user.id,
-            models.Prospecto.fecha_registro >= fecha_inicio_dt,
-            models.Prospecto.fecha_registro <= fecha_fin_dt
+    # extraer objetos date para comparaciones que requieran solo fecha (como cotizaciones)
+    fecha_inicio_date = fecha_inicio_dt.date()
+    fecha_fin_date = fecha_fin_dt.date()
+    
+    # ✅ CONSTRUIR QUERY SEGÚN TIPO DE FILTRO Y FECHAS
+    if tipo_filtro == "estado" and valor_filtro == EstadoProspecto.COTIZADO.value:
+        # COTIZADOS: Usar EstadisticaCotizacion (comparar fechas, no datetimes)
+        query = db.query(models.Prospecto).join(
+            models.EstadisticaCotizacion, 
+            models.EstadisticaCotizacion.prospecto_id == models.Prospecto.id
+        ).filter(
+            models.EstadisticaCotizacion.fecha_cotizacion >= fecha_inicio_date,
+            models.EstadisticaCotizacion.fecha_cotizacion <= fecha_fin_date
         )
+        if user.tipo_usuario == TipoUsuario.AGENTE.value:
+            query = query.filter(models.EstadisticaCotizacion.agente_id == user.id)
+            
+        titulo_filtro = "Prospectos Cotizados en el periodo"
+
+    elif (tipo_filtro == "estado" and valor_filtro in [
+            EstadoProspecto.EN_SEGUIMIENTO.value, 
+            EstadoProspecto.GANADO.value, 
+            EstadoProspecto.CERRADO_PERDIDO.value
+        ]) or (tipo_filtro == "ventas"):
+        
+        # SEGUIMIENTO, GANADOS, PERDIDOS: Usar HistorialEstado
+        target_state = valor_filtro
+        if tipo_filtro == "ventas":
+            target_state = EstadoProspecto.GANADO.value
+            titulo_filtro = "Ventas realizadas en el periodo"
+        else:
+            titulo_filtro = f"Prospectos {valor_filtro.replace('_', ' ').title()} en el periodo"
+            
+        query = db.query(models.Prospecto).join(
+            models.HistorialEstado,
+            models.HistorialEstado.prospecto_id == models.Prospecto.id
+        ).filter(
+            models.HistorialEstado.estado_nuevo == target_state,
+            models.HistorialEstado.fecha_cambio >= fecha_inicio_dt,
+            models.HistorialEstado.fecha_cambio <= fecha_fin_dt
+        )
+        
+        if user.tipo_usuario == TipoUsuario.AGENTE.value:
+            query = query.filter(models.HistorialEstado.usuario_id == user.id)
+
     else:
+        # OTROS (Nuevos, Total, Asignación, etc.): Usar Fecha de Registro
         query = db.query(models.Prospecto).filter(
             models.Prospecto.fecha_registro >= fecha_inicio_dt,
             models.Prospecto.fecha_registro <= fecha_fin_dt
         )
+        
+        if user.tipo_usuario == TipoUsuario.AGENTE.value:
+            query = query.filter(models.Prospecto.agente_asignado_id == user.id)
     
-    # Aplicar filtros según el tipo
-    titulo_filtro = ""
-    
-    if tipo_filtro == "estado":
+    # ✅ Filtro por agente explicito (para Admin/Supervisor) - MOVIDO FUERA DEL ELSE
+    if agente_asignado_id and agente_asignado_id != "todos":
+        try:
+            # Si estamos filtrando historia/stats, el filtro de agente es diferente
+            if tipo_filtro == "estado" and valor_filtro == EstadoProspecto.COTIZADO.value:
+                query = query.filter(models.EstadisticaCotizacion.agente_id == int(agente_asignado_id))
+            elif (tipo_filtro == "estado" and valor_filtro in [EstadoProspecto.EN_SEGUIMIENTO.value, EstadoProspecto.GANADO.value, EstadoProspecto.CERRADO_PERDIDO.value]) or (tipo_filtro == "ventas"):
+                query = query.filter(models.HistorialEstado.usuario_id == int(agente_asignado_id))
+            else:
+                query = query.filter(models.Prospecto.agente_asignado_id == int(agente_asignado_id))
+        except ValueError:
+            pass
+            
+    # Aplicar filtros específicos adicionales
+    if tipo_filtro == "estado":  # Solo queda NUEVO o cualquier otro no manejado arriba
         query = query.filter(models.Prospecto.estado == valor_filtro)
         titulo_filtro = f"Prospectos en estado: {valor_filtro.replace('_', ' ').title()}"
-    
+        
     elif tipo_filtro == "asignacion":
         if valor_filtro == "sin_asignar":
             query = query.filter(models.Prospecto.agente_asignado_id == None)
@@ -1986,10 +2154,6 @@ async def prospectos_filtro_dashboard(
         elif valor_filtro == "asignados":
             query = query.filter(models.Prospecto.agente_asignado_id != None)
             titulo_filtro = "Prospectos asignados"
-    
-    elif tipo_filtro == "ventas":
-        query = query.filter(models.Prospecto.estado == EstadoProspecto.GANADO.value)
-        titulo_filtro = "Ventas realizadas"
     
     elif tipo_filtro == "destino":
         query = query.filter(models.Prospecto.destino.ilike(f"%{valor_filtro}%"))
@@ -2002,10 +2166,9 @@ async def prospectos_filtro_dashboard(
         elif valor_filtro == "sin_datos":
             query = query.filter(models.Prospecto.tiene_datos_completos == False)
             titulo_filtro = "Prospectos sin datos (solo teléfono)"
-    
+            
     elif tipo_filtro == "total":
-        # Todos los prospectos (sin filtro adicional)
-        titulo_filtro = "Todos los prospectos"
+        titulo_filtro = "Todos los prospectos registrados"
     
     # Obtener total y prospectos paginados
     total_prospectos = query.count()
@@ -2038,8 +2201,8 @@ async def prospectos_filtro_dashboard(
         "fecha_inicio_activa": fecha_inicio,
         "fecha_fin_activa": fecha_fin,
         "periodo_activo": periodo,
-        "fecha_inicio_formateada": fecha_inicio_obj.strftime("%d/%m/%Y"),
-        "fecha_fin_formateada": fecha_fin_obj.strftime("%d/%m/%Y")
+        "fecha_inicio_formateada": fecha_inicio_dt.strftime("%d/%m/%Y"),
+        "fecha_fin_formateada": fecha_fin_dt.strftime("%d/%m/%Y")
     })
 
 
@@ -2153,13 +2316,14 @@ async def estadisticas_cotizaciones(
     
     try:
         # Determinar rango de fechas
-        fecha_inicio_obj, fecha_fin_obj = calcular_rango_fechas(periodo, fecha_inicio, fecha_fin)
+        fecha_inicio_dt, fecha_fin_dt = calcular_rango_fechas(periodo, fecha_inicio, fecha_fin)
+        fecha_inicio_obj = fecha_inicio_dt.date()
+        fecha_fin_obj = fecha_fin_dt.date()
         
         # Construir query base
         query = db.query(
             models.EstadisticaCotizacion,
-            models.Usuario.username,
-            func.count(models.EstadisticaCotizacion.id).label('total_cotizaciones')
+            models.Usuario.username
         ).join(
             models.Usuario, models.EstadisticaCotizacion.agente_id == models.Usuario.id
         ).filter(
@@ -2175,10 +2339,14 @@ async def estadisticas_cotizaciones(
             query = query.filter(models.EstadisticaCotizacion.agente_id == user.id)
         
         # Agrupar por agente y fecha
-        estadisticas = query.group_by(
-            models.EstadisticaCotizacion.agente_id,
-            models.Usuario.username,
-            models.EstadisticaCotizacion.fecha_cotizacion
+        # ✅ CAMBIO: Obtener lista detallada de cotizaciones individualmente
+        estadisticas = query.add_columns(
+            models.Prospecto.id.label('prospecto_id'),
+            models.Prospecto.nombre,
+            models.Prospecto.apellido,
+            models.Prospecto.telefono
+        ).join(
+            models.Prospecto, models.EstadisticaCotizacion.prospecto_id == models.Prospecto.id
         ).order_by(
             models.EstadisticaCotizacion.fecha_cotizacion.desc(),
             models.Usuario.username
@@ -2186,6 +2354,7 @@ async def estadisticas_cotizaciones(
         
         # Estadísticas resumidas por agente
         resumen_agentes = db.query(
+            models.Usuario.id,
             models.Usuario.username,
             func.count(models.EstadisticaCotizacion.id).label('total')
         ).join(

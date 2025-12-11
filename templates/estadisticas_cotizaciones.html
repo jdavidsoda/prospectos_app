@@ -10,60 +10,62 @@
     </div>
 </div>
 
-<!-- Filtros -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h6 class="card-title mb-0">Filtros</h6>
-    </div>
-    <div class="card-body">
-        <form method="get" action="/estadisticas/cotizaciones" class="row g-3" id="filtroForm">
-            <div class="col-md-3">
-                <label class="form-label">Periodo</label>
-                <select class="form-select" name="periodo" id="selectPeriodo">
-                    <option value="dia" {% if periodo_activo == 'dia' %}selected{% endif %}>Hoy</option>
-                    <option value="semana" {% if periodo_activo == 'semana' %}selected{% endif %}>Esta Semana</option>
-                    <option value="mes" {% if periodo_activo == 'mes' %}selected{% endif %}>Este Mes</option>
-                    <option value="año" {% if periodo_activo == 'año' %}selected{% endif %}>Este Año</option>
-                    <option value="personalizado" {% if periodo_activo == 'personalizado' %}selected{% endif %}>Personalizado</option>
+<!-- Filtros Compactos -->
+<div class="card mb-4 border-0 shadow-sm bg-light">
+    <div class="card-body py-2">
+        <form method="get" action="/estadisticas/cotizaciones"
+            class="row row-cols-lg-auto g-3 align-items-center justify-content-end" id="filtroForm">
+            <div class="col-12">
+                <span class="fw-bold text-muted small me-2"><i class="fas fa-filter"></i> Filtros:</span>
+            </div>
+
+            <!-- Periodo -->
+            <div class="col-12">
+                <select class="form-select form-select-sm" name="periodo" id="selectPeriodo" style="max-width: 150px;">
+                    <option value="dia" {% if periodo_activo=='dia' %}selected{% endif %}>📅 Hoy</option>
+                    <option value="semana" {% if periodo_activo=='semana' %}selected{% endif %}>📅 Esta Semana</option>
+                    <option value="mes" {% if periodo_activo=='mes' %}selected{% endif %}>📅 Este Mes</option>
+                    <option value="año" {% if periodo_activo=='año' %}selected{% endif %}>📅 Este Año</option>
+                    <option value="personalizado" {% if periodo_activo=='personalizado' %}selected{% endif %}>⚙️
+                        Personalizado</option>
                 </select>
             </div>
-            
-            <!-- Campos de fecha personalizada -->
-            <div class="col-md-3" id="fechaInicioGroup" style="display: {% if periodo_activo == 'personalizado' %}block{% else %}none{% endif %};">
-                <label class="form-label">Fecha Inicio</label>
-                <input type="text" class="form-control" name="fecha_inicio" 
-                       value="{{ fecha_inicio_activa or '' }}" placeholder="dd/mm/aaaa">
+
+            <div class="col-12" id="fechaInicioGroup"
+                style="display: {% if periodo_activo == 'personalizado' %}block{% else %}none{% endif %};">
+                <input type="text" class="form-control form-select-sm date-picker-input" name="fecha_inicio"
+                    value="{{ fecha_inicio_activa or '' }}" placeholder="Inicio" style="max-width: 140px;">
             </div>
-            
-            <div class="col-md-3" id="fechaFinGroup" style="display: {% if periodo_activo == 'personalizado' %}block{% else %}none{% endif %};">
-                <label class="form-label">Fecha Fin</label>
-                <input type="text" class="form-control" name="fecha_fin" 
-                       value="{{ fecha_fin_activa or '' }}" placeholder="dd/mm/aaaa">
+
+            <div class="col-12" id="fechaFinGroup"
+                style="display: {% if periodo_activo == 'personalizado' %}block{% else %}none{% endif %};">
+                <input type="text" class="form-control form-select-sm date-picker-input" name="fecha_fin"
+                    value="{{ fecha_fin_activa or '' }}" placeholder="Fin" style="max-width: 140px;">
             </div>
-            
+
             {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
-            <div class="col-md-3">
-                <label class="form-label">Agente</label>
-                <select class="form-select" name="agente_id">
-                    <option value="todos">Todos los agentes</option>
+            <div class="col-12">
+                <select class="form-select form-select-sm" name="agente_id" style="max-width: 180px;">
+                    <option value="todos">👤 Todos los agentes</option>
                     {% for agente in agentes %}
-                    <option value="{{ agente.id }}" {% if agente_id_activo == agente.id|string %}selected{% endif %}>
+                    <option value="{{ agente.id }}" {% if agente_id_activo==agente.id|string %}selected{% endif %}>
                         {{ agente.username }}
                     </option>
                     {% endfor %}
                 </select>
             </div>
             {% endif %}
-            
-            <div class="col-md-3 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">Aplicar Filtros</button>
+
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary btn-sm px-3 rounded-pill">
+                    Aplicar
+                </button>
             </div>
         </form>
-        
         {% if fecha_inicio_formateada and fecha_fin_formateada %}
-        <div class="mt-3">
-            <small class="text-muted">
-                Mostrando estadísticas del <strong>{{ fecha_inicio_formateada }}</strong> al <strong>{{ fecha_fin_formateada }}</strong>
+        <div class="text-end mt-1">
+            <small class="text-muted" style="font-size: 0.7rem;">
+                Mostrando: <strong>{{ fecha_inicio_formateada }}</strong> - <strong>{{ fecha_fin_formateada }}</strong>
             </small>
         </div>
         {% endif %}
@@ -71,14 +73,21 @@
 </div>
 
 <!-- Resumen por Agente -->
-<div class="row mb-4">
+<h6 class="text-muted fw-bold mb-3 text-uppercase small ls-1">Resumen por Agente</h6>
+<div class="row g-3 mb-4">
     {% for agente in resumen_agentes %}
-    <div class="col-md-3">
-        <div class="card text-white bg-success">
-            <div class="card-body text-center">
-                <h6 class="card-title">{{ agente.username }}</h6>
-                <h2>{{ agente.total }}</h2>
-                <small>Cotizaciones</small>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 border-0 shadow-sm hover-up text-center">
+            <div class="card-body p-3">
+                <div class="icon-shape rounded-circle mb-2 bg-soft-success text-success mx-auto">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <h6 class="card-title fw-bold mb-1">{{ agente.username }}</h6>
+                <a href="/prospectos/filtro?tipo_filtro=estado&valor_filtro=cotizado&agente_asignado_id={{ agente.id }}&fecha_inicio={{ fecha_inicio_activa or '' }}&fecha_fin={{ fecha_fin_activa or '' }}&periodo={{ periodo_activo }}"
+                    class="text-decoration-none text-dark">
+                    <h3 class="mb-0 fw-bold">{{ agente.total }}</h3>
+                </a>
+                <small class="text-muted text-uppercase" style="font-size: 0.7rem;">Cotizaciones</small>
             </div>
         </div>
     </div>
@@ -86,42 +95,39 @@
 </div>
 
 <!-- Detalle de Estadísticas -->
-<div class="card">
-    <div class="card-header">
-        <h5 class="card-title mb-0">Detalle de Cotizaciones por Día</h5>
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 py-3">
+        <h5 class="card-title mb-0 text-primary fw-bold">Detalle de Cotizaciones por Día</h5>
     </div>
-    <div class="card-body">
+    <div class="card-body p-0">
         {% if estadisticas %}
         <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-muted small">
                     <tr>
-                        <th>Fecha</th>
-                        <th>Agente</th>
-                        <th>ID Cotización</th>
-                        <th>ID Cliente</th>
-                        <th>Total Cotizaciones</th>
+                        <th class="ps-4 py-3">Fecha</th>
+                        <th class="py-3">Agente</th>
+                        <th class="py-3">Cliente</th>
+                        <th class="text-center py-3">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for stats in estadisticas %}
                     <tr>
-                        <td>{{ stats.EstadisticaCotizacion.fecha_cotizacion.strftime('%d/%m/%Y') }}</td>
-                        <td>{{ stats.username }}</td>
+                        <td class="ps-4 fw-bold text-dark">{{
+                            stats.EstadisticaCotizacion.fecha_cotizacion.strftime('%d/%m/%Y') }}</td>
                         <td>
-                            <a href="/prospectos/{{ stats.EstadisticaCotizacion.prospecto_id }}/seguimiento" 
-                               class="badge bg-info text-decoration-none">
-                                C-{{ stats.EstadisticaCotizacion.id }}
-                            </a>
+                            <span class="badge bg-soft-primary text-primary rounded-pill px-3">{{ stats.username
+                                }}</span>
                         </td>
-                        <td>
-                            <a href="/prospectos/{{ stats.EstadisticaCotizacion.prospecto_id }}/seguimiento" 
-                               class="badge bg-secondary text-decoration-none">
-                                CL-{{ stats.EstadisticaCotizacion.prospecto_id }}
-                            </a>
+                        <td class="fw-500">
+                            {{ stats.nombre }} {{ stats.apellido or '' }}
                         </td>
-                        <td>
-                            <span class="badge bg-primary">{{ stats.total_cotizaciones }}</span>
+                        <td class="text-center">
+                            <a href="/prospectos/{{ stats.prospecto_id }}/seguimiento"
+                                class="btn btn-sm btn-outline-info rounded-pill px-3" target="_blank">
+                                📋 Ver Seguimiento
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -129,82 +135,34 @@
             </table>
         </div>
         {% else %}
-        <div class="text-center py-4">
-            <p class="text-muted">No hay datos de cotizaciones para el periodo seleccionado.</p>
+        <div class="text-center py-5">
+            <div class="mb-3 text-muted opacity-50 display-4"><i class="fas fa-folder-open"></i></div>
+            <p class="text-muted fw-bold">No hay datos para el periodo seleccionado.</p>
         </div>
         {% endif %}
     </div>
 </div>
-<!-- ✅ AGREGAR DATEPICKER -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar datepicker para campos de fecha
-    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
-    
-    fechaInputs.forEach(input => {
-        flatpickr(input, {
-            dateFormat: "d/m/Y",
-            locale: "es",
-            allowInput: true,
-            disableMobile: true, // Para mejor experiencia en desktop
-            onChange: function(selectedDates, dateStr, instance) {
-                // Formatear automáticamente mientras se escribe
-                if (dateStr) {
-                    instance.setDate(dateStr, true, "d/m/Y");
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializar datepicker globalmente (si no se ha hecho ya en base.html) pero los inputs ya tienen la clase
+
+        // Mostrar/ocultar campos de fecha personalizada
+        const selectPeriodo = document.getElementById('selectPeriodo');
+        const fechaInicioGroup = document.getElementById('fechaInicioGroup');
+        const fechaFinGroup = document.getElementById('fechaFinGroup');
+
+        if (selectPeriodo) {
+            selectPeriodo.addEventListener('change', function () {
+                if (this.value === 'personalizado') {
+                    fechaInicioGroup.style.display = 'block';
+                    fechaFinGroup.style.display = 'block';
+                } else {
+                    fechaInicioGroup.style.display = 'none';
+                    fechaFinGroup.style.display = 'none';
                 }
-            }
-        });
-    });
-    
-    // Mostrar/ocultar campos de fecha personalizada
-    const selectPeriodo = document.getElementById('selectPeriodo');
-    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
-    const fechaFinGroup = document.getElementById('fechaFinGroup');
-    
-    if (selectPeriodo) {
-        selectPeriodo.addEventListener('change', function() {
-            if (this.value === 'personalizado') {
-                fechaInicioGroup.style.display = 'block';
-                fechaFinGroup.style.display = 'block';
-            } else {
-                fechaInicioGroup.style.display = 'none';
-                fechaFinGroup.style.display = 'none';
-            }
-        });
-    }
-});
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Mostrar/ocultar campos de fecha personalizada
-    const selectPeriodo = document.getElementById('selectPeriodo');
-    const fechaInicioGroup = document.getElementById('fechaInicioGroup');
-    const fechaFinGroup = document.getElementById('fechaFinGroup');
-    
-    selectPeriodo.addEventListener('change', function() {
-        if (this.value === 'personalizado') {
-            fechaInicioGroup.style.display = 'block';
-            fechaFinGroup.style.display = 'block';
-        } else {
-            fechaInicioGroup.style.display = 'none';
-            fechaFinGroup.style.display = 'none';
+            });
         }
     });
-    
-    // Formato automático de fechas
-    const fechaInputs = document.querySelectorAll('input[placeholder="dd/mm/aaaa"]');
-    fechaInputs.forEach(input => {
-        input.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2);
-            if (value.length >= 5) value = value.substring(0, 5) + '/' + value.substring(5, 9);
-            e.target.value = value;
-        });
-    });
-});
 </script>
 {% endblock %}

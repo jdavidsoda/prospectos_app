@@ -34,7 +34,7 @@ class Usuario(Base):
     hashed_password = Column(String(255), nullable=False)
     tipo_usuario = Column(String(20), nullable=False, default=TipoUsuario.AGENTE.value)
     activo = Column(Integer, default=1)
-    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    fecha_creacion = Column(DateTime, default=datetime.now)
 
 class Prospecto(Base):
     __tablename__ = "prospectos"
@@ -58,7 +58,7 @@ class Prospecto(Base):
     pasajeros_infantes = Column(Integer, default=0)
     medio_ingreso_id = Column(Integer, ForeignKey("medios_ingreso.id"))
     observaciones = Column(Text)
-    fecha_registro = Column(DateTime, default=datetime.utcnow)
+    fecha_registro = Column(DateTime, default=datetime.now)
     agente_asignado_id = Column(Integer, ForeignKey("usuarios.id"))
     estado = Column(String(20), default=EstadoProspecto.NUEVO.value)
     # ✅ NUEVO: Clasificación de datos
@@ -127,7 +127,7 @@ class Interaccion(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     tipo_interaccion = Column(String(20))
     descripcion = Column(Text, nullable=False)
-    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    fecha_creacion = Column(DateTime, default=datetime.now)
     estado_anterior = Column(String(20))
     estado_nuevo = Column(String(20))
     
@@ -146,7 +146,7 @@ class Documento(Base):
     nombre_archivo = Column(String(255), nullable=False)
     tipo_documento = Column(String(20))
     ruta_archivo = Column(String(500), nullable=False)
-    fecha_subida = Column(DateTime, default=datetime.utcnow)
+    fecha_subida = Column(DateTime, default=datetime.now)
     descripcion = Column(Text)
     
     # Relaciones
@@ -169,7 +169,7 @@ class EstadisticaCotizacion(Base):
     agente_id = Column(Integer, ForeignKey("usuarios.id"))
     prospecto_id = Column(Integer, ForeignKey("prospectos.id"))
     fecha_cotizacion = Column(Date, nullable=False)
-    fecha_registro = Column(DateTime, default=datetime.utcnow)
+    fecha_registro = Column(DateTime, default=datetime.now)
     
     # Relaciones
     agente = relationship("Usuario")
@@ -190,7 +190,7 @@ class HistorialEstado(Base):
     estado_anterior = Column(String(20))
     estado_nuevo = Column(String(20))
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
-    fecha_cambio = Column(DateTime, default=datetime.utcnow)
+    fecha_cambio = Column(DateTime, default=datetime.now)
     comentario = Column(Text)
     
     # Relaciones
