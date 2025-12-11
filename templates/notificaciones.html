@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Notificaciones - ZARITA!{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-3 border-bottom">
+    <h1 class="h2 fw-bold text-primary">🔔 Centro de Notificaciones</h1>
+
+    {% if current_user.tipo_usuario in ['administrador', 'supervisor'] %}
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <form class="d-flex align-items-center" method="get" action="/notificaciones">
+            <span class="me-2 text-muted small">Filtrar por agente:</span>
+            <select class="form-select form-select-sm me-2" name="filtro_agente_id" onchange="this.form.submit()">
+                <option value="todos">Ver Todos</option>
+                {% for agente in agentes %}
+                <option value="{{ agente.id }}" {% if filtro_agente_id==agente.id|string %}selected{% endif %}>
+                    {{ agente.username }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- KPIs Rápidos -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="icon-shape bg-white text-primary rounded-circle me-3">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <div>
+                    <h3 class="mb-0 fw-bold">{{ notificaciones|length }}</h3>
+                    <small class="text-white-50">Pendientes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+        <h5 class="card-title mb-0">Alertas Recientes</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Tipo</th>
+                        <th>Mensaje / Prospecto</th>
+                        <th>Agente</th>
+                        <th>Tiempo</th>
+                        <th class="text-end pe-4">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if notificaciones %}
+                    {% for notif in notificaciones %}
+                    <tr class="{% if notif.leida %}bg-light opacity-75{% endif %}">
+                        <td class="ps-4">
+                            {% if notif.tipo == 'asignacion' %}
+                            <div class="icon-shape icon-sm bg-soft-primary text-primary rounded-circle">
+                                <i class="fas fa-user-plus"></i>
+                            </div>
+                            {% elif notif.tipo == 'inactividad' %}
+                            <div class="icon-shape icon-sm bg-soft-danger text-danger rounded-circle">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            {% elif notif.tipo == 'seguimiento' %}
+                            <div class="icon-shape icon-sm bg-soft-warning text-warning rounded-circle">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            {% else %}
+                            <div class="icon-shape icon-sm bg-soft-secondary text-secondary rounded-circle">
+                                <i class="fas fa-info"></i>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ notif.mensaje }}</div>
+                            {% if notif.prospecto %}
+                            <a href="/prospectos/{{ notif.prospecto.id }}/seguimiento"
+                                class="small text-decoration-none">
+                                Ver Prospecto: {{ notif.prospecto.nombre }} {{ notif.prospecto.apellido }}
+                            </a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                <i class="fas fa-user-circle me-1"></i> {{ notif.usuario.username }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if notif.tipo == 'seguimiento' and notif.fecha_programada %}
+                            <span
+                                class="badge {% if notif.es_tarde %}bg-soft-danger text-danger{% else %}bg-soft-success text-success{% endif %}">
+                                <i class="fas fa-stopwatch me-1"></i> {{ notif.tiempo_restante_str }}
+                            </span>
+                            <div class="small text-muted mt-1">{{ notif.fecha_programada.strftime('%d/%m %H:%M') }}
+                            </div>
+                            {% else %}
+                            <span class="text-muted small">{{ notif.tiempo_restante_str }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <form action="/notificaciones/{{ notif.id }}/leer" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary rounded-circle"
+                                    title="Marcar como leída">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                            {% if notif.prospecto %}
+                            <a href="/prospectos/{{ notif.prospecto.id }}/seguimiento"
+                                class="btn btn-sm btn-outline-primary rounded-circle ms-1" title="Gestionar">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="far fa-bell-slash fa-2x mb-3"></i>
+                            <p>No tienes notificaciones pendientes.</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .icon-shape.icon-sm {
+        width: 32px;
+        height: 32px;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}

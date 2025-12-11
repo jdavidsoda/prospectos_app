@@ -19,10 +19,31 @@ import auth
 from models import TipoUsuario, EstadoProspecto
 from sqlalchemy import func, or_, and_
 from difflib import get_close_matches
+import smtplib
+from email.mime.text import MIMEText
 import re
 
 
 
+
+def enviar_notificacion_email(destinatario: str, asunto: str, cuerpo: str):
+    """Envía una notificación por correo electrónico (Simulado por ahora)"""
+    try:
+        # En un entorno real, aquí se configurarían las credenciales SMTP
+        # server = smtplib.SMTP('smtp.gmail.com', 587)
+        # server.starttls()
+        # server.login("tu_correo@gmail.com", "tu_password")
+        # msg = MIMEText(cuerpo)
+        # msg['Subject'] = asunto
+        # msg['From'] = "sistema@prospectos.com"
+        # msg['To'] = destinatario
+        # server.send_message(msg)
+        # server.quit()
+        print(f"📧 [EMAIL SIMULADO] A: {destinatario} | Asunto: {asunto}")
+        return True
+    except Exception as e:
+        print(f"❌ Error enviando email: {e}")
+        return False
 
 def parsear_fecha(fecha_str: str) -> Optional[date]:
     """Helper para parsear fechas en formatos DD/MM/YYYY o YYYY-MM-DD"""
@@ -1120,6 +1141,23 @@ async def asignar_agente(
             
             prospecto.agente_asignado_id = agente_id
             mensaje = f"Agente {agente.username} asignado correctamente"
+            
+            # ✅ CREAR NOTIFICACIÓN DE ASIGNACIÓN
+            notificacion = models.Notificacion(
+                usuario_id=agente.id,
+                prospecto_id=prospecto.id,
+                tipo="asignacion",
+                mensaje=f"Te han asignado un nuevo prospecto: {prospecto.nombre} {prospecto.apellido or ''}",
+                email_enviado=False
+            )
+            db.add(notificacion)
+            
+            # ✅ ENVIAR EMAIL AL AGENTE
+            if agente.email:
+                asunto = "Nuevo Prospecto Asignado 🚀"
+                cuerpo = f"Hola {agente.username},\n\nSe te ha asignado el prospecto {prospecto.nombre} {prospecto.apellido}.\n\nIngresa al sistema para gestionarlo."
+                enviado = enviar_notificacion_email(agente.email, asunto, cuerpo)
+                notificacion.email_enviado = enviado
         
         db.commit()
         
@@ -1211,6 +1249,7 @@ async def registrar_interaccion(
     descripcion: str = Form(...),
     tipo_interaccion: str = Form("general"),
     cambio_estado: str = Form(None),
+    fecha_proximo_contacto: str = Form(None),
     db: Session = Depends(database.get_db)
 ):
     user = await get_current_user(request, db)
@@ -1280,6 +1319,32 @@ async def registrar_interaccion(
         )
         
         db.add(interaccion)
+        
+        # ✅ CREAR NOTIFICACIÓN DE SEGUIMIENTO (SI SE PROGRAMA)
+        if fecha_proximo_contacto:
+            try:
+                # El formato de input datetime-local es "YYYY-MM-DDTHH:MM"
+                fecha_prog = datetime.strptime(fecha_proximo_contacto, "%Y-%m-%dT%H:%M")
+                
+                notificacion = models.Notificacion(
+                    usuario_id=user.id,
+                    prospecto_id=prospecto_id,
+                    tipo="seguimiento",
+                    mensaje=f"Recordatorio: {descripcion[:50]}...",
+                    fecha_programada=fecha_prog,
+                    email_enviado=False
+                )
+                db.add(notificacion)
+                
+                # Feedback visual en el log/email
+                if user.email:
+                    enviar_notificacion_email(
+                        user.email, 
+                        "Recordatorio Programado 📅", 
+                        f"Has programado un seguimiento para el prospecto {prospecto.nombre} el {fecha_prog}."
+                    )
+            except ValueError:
+                print(f"❌ Error formato fecha recordatorio: {fecha_proximo_contacto}")
         
         # ✅ REGISTRAR ESTADÍSTICA DE COTIZACIÓN
         if (cambio_estado == EstadoProspecto.COTIZADO.value and 
@@ -2391,6 +2456,140 @@ async def estadisticas_cotizaciones(
     except Exception as e:
         print(f"❌ Error en estadísticas: {e}")
         return RedirectResponse(url="/dashboard?error=Error al cargar estadísticas", status_code=303)
+
+
+# ========== SISTEMA DE NOTIFICACIONES ==========
+
+def check_inactivity(db: Session):
+    """Verifica prospectos nuevos sin gestión por más de 4 horas"""
+    limite = datetime.now() - timedelta(hours=4)
+    
+    # Prospectos nuevos creados antes del limite
+    prospectos_inactivos = db.query(models.Prospecto).filter(
+        models.Prospecto.estado == EstadoProspecto.NUEVO.value,
+        models.Prospecto.fecha_registro <= limite
+    ).all()
+    
+    count = 0
+    for p in prospectos_inactivos:
+        # Verificar si ya tiene alerta de inactividad reciente (últimas 24h)
+        existe_alerta = db.query(models.Notificacion).filter(
+            models.Notificacion.prospecto_id == p.id,
+            models.Notificacion.tipo == "inactividad",
+            models.Notificacion.fecha_creacion >= datetime.now() - timedelta(hours=24)
+        ).first()
+        
+        if not existe_alerta:
+            # Buscar supervisor/admin para notificar (o al agente si está asignado, aunque nuevos suelen estar sin asignar)
+            # Si tiene agente, notificamos al agente. Si no, a todos los admins/supervisores.
+            destinatarios = []
+            if p.agente_asignado_id:
+                destinatarios.append(p.agente_asignado_id)
+            else:
+                # Notificar a admins/supervisores
+                admins = db.query(models.Usuario).filter(
+                    models.Usuario.tipo_usuario.in_([TipoUsuario.ADMINISTRADOR.value, TipoUsuario.SUPERVISOR.value])
+                ).all()
+                destinatarios = [u.id for u in admins]
+            
+            for uid in destinatarios:
+                notificacion = models.Notificacion(
+                    usuario_id=uid,
+                    prospecto_id=p.id,
+                    tipo="inactividad",
+                    mensaje=f"⚠️ Prospecto inactivo > 4h: {p.nombre} {p.apellido or ''}",
+                    email_enviado=False
+                )
+                db.add(notificacion)
+                count += 1
+    
+    db.commit()
+    return count
+
+@app.get("/api/notificaciones/check-inactivity")
+async def api_check_inactivity(
+    db: Session = Depends(database.get_db)
+):
+    """Endpoint para activar la verificación manual o por cron"""
+    try:
+        count = check_inactivity(db)
+        return {"status": "ok", "alertas_generadas": count}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/notificaciones", response_class=HTMLResponse)
+async def ver_notificaciones(
+    request: Request,
+    filtro_agente_id: str = Query(None),
+    db: Session = Depends(database.get_db)
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/", status_code=303)
+    
+    # Trigger inactividad check al cargar (para asegurar alertas frescas)
+    check_inactivity(db)
+    
+    query = db.query(models.Notificacion).filter(
+        models.Notificacion.leida == False
+    )
+    
+    if user.tipo_usuario == TipoUsuario.AGENTE.value:
+        query = query.filter(models.Notificacion.usuario_id == user.id)
+    elif filtro_agente_id and filtro_agente_id != "todos":
+        query = query.filter(models.Notificacion.usuario_id == int(filtro_agente_id))
+        
+    notificaciones = query.order_by(models.Notificacion.fecha_creacion.desc()).all()
+    
+    # Calcular tiempos
+    for n in notificaciones:
+        if n.fecha_programada:
+            delta = n.fecha_programada - datetime.now()
+            # Formatear tiempo restante
+            dias = delta.days
+            horas, resto = divmod(delta.seconds, 3600)
+            minutos, _ = divmod(resto, 60)
+            
+            if delta.total_seconds() > 0:
+                if dias > 0:
+                    n.tiempo_restante_str = f"{dias}d {horas}h"
+                else:
+                    n.tiempo_restante_str = f"{horas}h {minutos}m"
+                n.es_tarde = False
+            else:
+                n.tiempo_restante_str = "Vencida"
+                n.es_tarde = True
+        else:
+            delta = datetime.now() - n.fecha_creacion
+            dias = delta.days
+            horas, resto = divmod(delta.seconds, 3600)
+            n.tiempo_restante_str = f"Hace {dias}d {horas}h" if dias > 0 else f"Hace {horas}h"
+            n.es_tarde = False
+            
+    agentes = []
+    if user.tipo_usuario in [TipoUsuario.ADMINISTRADOR.value, TipoUsuario.SUPERVISOR.value]:
+        agentes = db.query(models.Usuario).filter(models.Usuario.tipo_usuario == TipoUsuario.AGENTE.value).all()
+        
+    return templates.TemplateResponse("notificaciones.html", {
+        "request": request,
+        "current_user": user,
+        "notificaciones": notificaciones,
+        "agentes": agentes,
+        "filtro_agente_id": filtro_agente_id
+    })
+
+@app.post("/notificaciones/{notificacion_id}/leer")
+async def marcar_notificacion_leida(
+    notificacion_id: int,
+    db: Session = Depends(database.get_db),
+    request: Request = None 
+):
+    notif = db.query(models.Notificacion).filter(models.Notificacion.id == notificacion_id).first()
+    if notif:
+        notif.leida = True
+        db.commit()
+    
+    return RedirectResponse(url="/notificaciones", status_code=303)
 
 
 if __name__ == "__main__":

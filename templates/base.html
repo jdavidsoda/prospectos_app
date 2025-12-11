@@ -230,6 +230,13 @@
                             Estadísticas</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link position-relative" href="/notificaciones">
+                            <i class="fas fa-bell me-1"></i> Notificaciones
+                            <!-- Badge dinámico (se podría inyectar desde backend si se quiere tiempo real) -->
+                            <!-- Por ahora estático o sin número, solo el acceso -->
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/busqueda_ids"><i class="fas fa-search me-1"></i> Buscar ID</a>
                     </li>
                     {% if current_user.tipo_usuario == 'administrador' %}

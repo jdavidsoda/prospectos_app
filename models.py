@@ -196,3 +196,20 @@ class HistorialEstado(Base):
     # Relaciones
     prospecto = relationship("Prospecto")
     usuario = relationship("Usuario")
+
+class Notificacion(Base):
+    __tablename__ = "notificaciones"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    prospecto_id = Column(Integer, ForeignKey("prospectos.id"))
+    tipo = Column(String(50))  # asignacion, inactividad, seguimiento
+    mensaje = Column(Text, nullable=False)
+    fecha_creacion = Column(DateTime, default=datetime.now)
+    fecha_programada = Column(DateTime, nullable=True)  # Para recordatorios futuros
+    leida = Column(Boolean, default=False)
+    email_enviado = Column(Boolean, default=False)
+    
+    # Relaciones
+    usuario = relationship("Usuario")
+    prospecto = relationship("Prospecto")
