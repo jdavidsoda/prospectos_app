@@ -11,12 +11,21 @@ CREDENTIALS_FILE = 'google_credentials.json'
 def get_drive_service():
     """Autentica la cuenta de servicio y retorna el objeto del servicio."""
     try:
-        if not os.path.exists(CREDENTIALS_FILE):
-            print(f"⚠️ ¡Atención! Falta el archivo {CREDENTIALS_FILE}.")
+        creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+        if creds_json:
+            import json
+            # Cargar desde variable de entorno (Render)
+            info = json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(
+                info, scopes=SCOPES)
+        elif os.path.exists(CREDENTIALS_FILE):
+            # Cargar desde archivo local (Desarrollo)
+            creds = service_account.Credentials.from_service_account_file(
+                CREDENTIALS_FILE, scopes=SCOPES)
+        else:
+            print(f"⚠️ ¡Atención! Falta el archivo {CREDENTIALS_FILE} o la variable GOOGLE_CREDENTIALS_JSON.")
             return None
             
-        creds = service_account.Credentials.from_service_account_file(
-            CREDENTIALS_FILE, scopes=SCOPES)
         return build('drive', 'v3', credentials=creds)
     except Exception as e:
         print(f"Error autenticando con Google Drive: {e}")
