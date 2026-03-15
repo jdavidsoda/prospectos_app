@@ -11,24 +11,32 @@ CREDENTIALS_FILE = 'google_credentials.json'
 def get_drive_service():
     """Autentica la cuenta de servicio y retorna el objeto del servicio."""
     try:
-        creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
-        if creds_json:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        
+        creds = None
+        
+        # 1. Intentar token OAuth de Usuario (Recomendado para cuentas comunes de Drive)
+        token_json = os.environ.get("GOOGLE_OAUTH_TOKEN_JSON")
+        if token_json:
             import json
-            # Cargar desde variable de entorno (Render)
-            info = json.loads(creds_json)
-            creds = service_account.Credentials.from_service_account_info(
-                info, scopes=SCOPES)
-        elif os.path.exists(CREDENTIALS_FILE):
-            # Cargar desde archivo local (Desarrollo)
-            creds = service_account.Credentials.from_service_account_file(
-                CREDENTIALS_FILE, scopes=SCOPES)
-        else:
-            print(f"⚠️ ¡Atención! Falta el archivo {CREDENTIALS_FILE} o la variable GOOGLE_CREDENTIALS_JSON.")
-            return None
+            info = json.loads(token_json)
+            creds = Credentials.from_authorized_user_info(info, SCOPES)
             
-        return build('drive', 'v3', credentials=creds)
+        elif os.path.exists('token.json'):
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+
+        if creds:
+            if not creds.valid:
+                if creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+            return build('drive', 'v3', credentials=creds)
+
+        print("⚠️ ¡Atención! Falta la variable GOOGLE_OAUTH_TOKEN_JSON (OAuth Token) en Render.")
+        return None
+        
     except Exception as e:
-        print(f"Error autenticando con Google Drive: {e}")
+        print(f"Error autenticando con Google Drive (OAuth): {e}")
         return None
 
 def upload_to_drive(file_data: bytes, filename: str, mime_type: str, folder_id: str = None) -> str:
