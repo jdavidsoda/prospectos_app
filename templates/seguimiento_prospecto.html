@@ -228,8 +228,13 @@
                                 documento.fecha_subida.strftime('%d/%m') }}
                             </div>
                         </div>
+                        {% if documento.ruta_archivo.startswith('gdrive://') %}
+                        <a href="/documentos/{{ documento.id }}/descargar" target="_blank"
+                            class="btn btn-sm btn-light text-primary rounded-circle" title="Ver en Google Drive"><i class="fab fa-google-drive"></i></a>
+                        {% else %}
                         <a href="/{{ documento.ruta_archivo }}" target="_blank"
-                            class="btn btn-sm btn-light text-primary rounded-circle"><i class="fas fa-download"></i></a>
+                            class="btn btn-sm btn-light text-primary rounded-circle" title="Descargar archivo local"><i class="fas fa-download"></i></a>
+                        {% endif %}
                     </div>
                     {% endfor %}
                     {% else %}

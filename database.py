@@ -11,9 +11,13 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
+    # Limpiar espacios en blanco o comillas accidentales
+    DATABASE_URL = DATABASE_URL.strip().strip("'").strip('"')
+    
     # SQLAlchemy 1.4+ requiere 'postgresql://' y algunas plataformas aún entregan 'postgres://'
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
     SQLALCHEMY_DATABASE_URL = DATABASE_URL
 else:
     # 2. Si no hay DATABASE_URL, arma la URL con las variables separadas (Desarrollo local)

@@ -1759,21 +1759,43 @@ async def subir_documento(
                 url=f"/prospectos/{prospecto_id}/seguimiento?error=Solo se permiten archivos PDF, Office e imágenes",
                 status_code=303
             )
+
+        # ✅ LEER Y COMPRIMIR EL ARCHIVO
+        file_content = await archivo.read()
+        from utils.compression import procesar_archivo_para_subida
         
-        # ✅ NUEVO: Crear directorio por fecha (uploads/YYYY/MM/DD/)
-        ruta_fecha = obtener_ruta_upload_por_fecha()
+        print(f"Tamaño original de {archivo.filename}: {len(file_content)} bytes")
+        file_content_compressed = procesar_archivo_para_subida(file_content, archivo.filename)
+        print(f"Tamaño comprimido de {archivo.filename}: {len(file_content_compressed)} bytes")
         
-        # Generar nombre único para el archivo
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        nombre_archivo = f"{timestamp}_{archivo.filename}"
-        ruta_archivo_completa = os.path.join(ruta_fecha, nombre_archivo)
+        # ✅ SUBIR A GOOGLE DRIVE
+        from services.google_drive import upload_to_drive
+        folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
         
-        # Guardar archivo
-        with open(ruta_archivo_completa, "wb") as buffer:
-            shutil.copyfileobj(archivo.file, buffer)
+        # Obtener mimetype básico
+        mimetype_map = {
+            '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+            '.png': 'image/png', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+        mime_type = mimetype_map.get(file_ext, 'application/octet-stream')
         
-        # ✅ GUARDAR RUTA RELATIVA desde uploads/ para portabilidad
-        ruta_relativa = os.path.relpath(ruta_archivo_completa, UPLOAD_DIR)
+        timestamp_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{archivo.filename}"
+        
+        # Subir a Drive. Devuelve el ID del archivo (ej: '1B2a_xY...')
+        drive_file_id = upload_to_drive(file_content_compressed, timestamp_name, mime_type, folder_id)
+        
+        if not drive_file_id:
+            # Fallback en caso de que Google Drive no esté configurado o falle, guardamos localmente
+            print("⚠️ Falla al subir a Drive. Guardando localmente como fallback.")
+            ruta_fecha = obtener_ruta_upload_por_fecha()
+            ruta_archivo_completa = os.path.join(ruta_fecha, timestamp_name)
+            with open(ruta_archivo_completa, "wb") as buffer:
+                buffer.write(file_content_compressed)
+            ruta_guardado = os.path.relpath(ruta_archivo_completa, UPLOAD_DIR)
+        else:
+            # Si se subió con éxito a Drive, guardamos el ID (con un prefijo para identificarlo luego)
+            ruta_guardado = f"gdrive://{drive_file_id}"
         
         # ✅ REGISTRAR DOCUMENTO EN BD
         documento = models.Documento(
@@ -1781,7 +1803,7 @@ async def subir_documento(
             usuario_id=user.id,
             nombre_archivo=archivo.filename,
             tipo_documento=tipo_documento,
-            ruta_archivo=ruta_relativa,  # Guardar ruta relativa
+            ruta_archivo=ruta_guardado,  # ID de Drive o ruta local
             descripcion=descripcion
         )
         
@@ -1867,6 +1889,33 @@ async def subir_documento(
             status_code=303
         )
 
+# ✅ NUEVO ENDPOINT: Descargar documento desde Google Drive
+@app.get("/documentos/{documento_id}/descargar")
+async def descargar_documento(
+    request: Request,
+    documento_id: int,
+    db: Session = Depends(database.get_db)
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/", status_code=303)
+        
+    documento = db.query(models.Documento).filter(models.Documento.id == documento_id).first()
+    if not documento:
+        return RedirectResponse(url="/prospectos?error=Documento no encontrado", status_code=303)
+        
+    # Verificar si es de drive
+    if documento.ruta_archivo and documento.ruta_archivo.startswith("gdrive://"):
+        file_id = documento.ruta_archivo.replace("gdrive://", "")
+        from services.google_drive import get_file_url
+        url = get_file_url(file_id)
+        # Redirigimos al visor web de Google Drive
+        return RedirectResponse(url=url)
+    
+    # Si es local, redirigimos a la ruta relativa que FastApi sirve
+    # ya que FastAPI está sirviendo el folder entero en /uploads,
+    # y ruta_archivo es por ejemplo '123/archivo.pdf', podemos redirigir a /uploads/123/archivo.pdf
+    return RedirectResponse(url=f"/uploads/{documento.ruta_archivo}")
 
 # ✅ NUEVO ENDPOINT: Búsqueda por ID
 @app.get("/busqueda_ids", response_class=HTMLResponse)
