@@ -46,26 +46,11 @@ def comprimir_imagen(archivo_bytes: bytes, formato: str, calidad: int = 70, max_
 
 def comprimir_pdf(archivo_bytes: bytes) -> bytes:
     """
-    Intenta optimizar un PDF. La compresión de PyPDF2 es básica (elimina info redundante),
-    pero funciona para algunos casos.
+    Desactivado temporalmente.
+    PyPDF2 a menudo corrompe o blanquea PDFs que son puramente imágenes escaneadas
+    al intentar reescribirlos. Es más seguro subir el PDF original de momento.
     """
-    try:
-        reader = PdfReader(BytesIO(archivo_bytes))
-        writer = PdfWriter()
-
-        for page in reader.pages:
-            writer.add_page(page)
-
-        # En PyPDF2 >= 3.0 se puede usar add_metadata y compresión
-        for page in writer.pages:
-            page.compress_content_streams()
-            
-        output = BytesIO()
-        writer.write(output)
-        return output.getvalue()
-    except Exception as e:
-        print(f"Error comprimiendo PDF: {e}")
-        return archivo_bytes  # Devuelve original si falla
+    return archivo_bytes
 
 def procesar_archivo_para_subida(archivo_bytes: bytes, filename: str) -> bytes:
     """

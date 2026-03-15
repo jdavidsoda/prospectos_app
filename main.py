@@ -1926,7 +1926,7 @@ async def borrar_documento(
         return RedirectResponse(url="/", status_code=303)
         
     # Solo ADMIN o SUPERVISOR pueden borrar documentos
-    if user.tipo_usuario not in [TipoUsuario.ADMIN.value, TipoUsuario.SUPERVISOR.value]:
+    if user.tipo_usuario not in [models.TipoUsuario.ADMINISTRADOR.value, models.TipoUsuario.SUPERVISOR.value]:
         return RedirectResponse(url="/prospectos?error=No tiene permisos para borrar documentos", status_code=303)
         
     documento = db.query(models.Documento).filter(models.Documento.id == documento_id).first()
