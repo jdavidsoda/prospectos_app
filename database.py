@@ -4,17 +4,27 @@ from models import Base
 import os
 from dotenv import load_dotenv
 
-# Cargar variables de entorno
+# Cargar variables de entorno (solo para local, en la nube las toma automáticamente)
 load_dotenv()
 
-# Configuración de la base de datos PostgreSQL
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Producto24*")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "prospectos_crm")
+# 1. Intentar usar DATABASE_URL primero (Render, Railway y Heroku usan esto por defecto)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+if DATABASE_URL:
+    # SQLAlchemy 1.4+ requiere 'postgresql://' y algunas plataformas aún entregan 'postgres://'
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URL = DATABASE_URL
+else:
+    # 2. Si no hay DATABASE_URL, arma la URL con las variables separadas (Desarrollo local)
+    DB_USER = os.getenv("DB_USER", "postgres")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "Producto24*")
+    DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = os.getenv("DB_PORT", "5432")
+    DB_NAME = os.getenv("DB_NAME", "prospectos_crm")
+    
+    # Usaremos psycopg2 como driver por ser el más estándar para despliegues
+    SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 

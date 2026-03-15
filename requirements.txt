@@ -4,7 +4,7 @@ uvicorn==0.24.0           # Servidor ASGI para ejecutar FastAPI
 
 # ========== Base de Datos ==========
 sqlalchemy>=2.0.36        # ORM para manejo de base de datos
-psycopg-binary>=3.1.0       # Driver de PostgreSQL moderno (v3) para Python
+psycopg2-binary>=2.9.9    # Driver de PostgreSQL más extendido y seguro para la nube
 
 # ========== Autenticación y Seguridad ==========
 python-jose==3.3.0        # Manejo de tokens JWT
