@@ -1791,10 +1791,19 @@ async def subir_documento(
         # ✅ GENERAR ID DE DOCUMENTO ÚNICO
         documento.generar_id_documento()
         
-        # ✅ CAMBIAR ESTADO A COTIZADO SI SE SUBE UNA COTIZACIÓN
+        # ✅ CAMBIAR ESTADO A COTIZADO SI SE SUBE UNA COTIZACIÓN Y NO ESTÁ EN ESTADOS FINALES
         if tipo_documento == "cotizacion":
             estado_anterior = prospecto.estado
-            prospecto.estado = EstadoProspecto.COTIZADO.value
+            
+            # No sobreescribir el estado si ya está ganado, perdido o cancelado
+            estados_protegidos = [
+                EstadoProspecto.GANADO.value, 
+                EstadoProspecto.CERRADO_PERDIDO.value,
+                EstadoProspecto.VENTA_CANCELADA.value
+            ]
+            
+            if prospecto.estado not in estados_protegidos:
+                prospecto.estado = EstadoProspecto.COTIZADO.value
             
             # ✅ REGISTRAR NUEVA ESTADÍSTICA DE COTIZACIÓN (SIEMPRE CREAR NUEVA)
             # Permitir múltiples cotizaciones por solicitud
@@ -1814,14 +1823,19 @@ async def subir_documento(
             print(f"✅ Nueva cotización generada: {estadistica.id_cotizacion}")
 
             
-            # Registrar interacción automática de cambio de estado
+            # Registrar interacción automática de cambio de estado o subida
+            if prospecto.estado != estado_anterior:
+                descripcion = f"Se subió cotización y cambió estado a Cotizado: {archivo.filename}"
+            else:
+                descripcion = f"Se subió cotización: {archivo.filename} (mantiene estado {estado_anterior})"
+                
             interaccion = models.Interaccion(
                 prospecto_id=prospecto_id,
                 usuario_id=user.id,
                 tipo_interaccion="documento",
-                descripcion=f"Se subió cotización: {archivo.filename}",
+                descripcion=descripcion,
                 estado_anterior=estado_anterior,
-                estado_nuevo=EstadoProspecto.COTIZADO.value
+                estado_nuevo=prospecto.estado
             )
             db.add(interaccion)
         
