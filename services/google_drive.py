@@ -63,3 +63,16 @@ def upload_to_drive(file_data: bytes, filename: str, mime_type: str, folder_id: 
 def get_file_url(file_id: str) -> str:
     """Retorna la URL de visualización en Drive"""
     return f"https://drive.google.com/file/d/{file_id}/view"
+
+def delete_from_drive(file_id: str) -> bool:
+    """Elimina un archivo de Google Drive dado su ID."""
+    service = get_drive_service()
+    if not service:
+        return False
+        
+    try:
+        service.files().delete(fileId=file_id).execute()
+        return True
+    except Exception as e:
+        print(f"Error borrando archivo de Drive: {e}")
+        return False

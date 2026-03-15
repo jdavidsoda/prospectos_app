@@ -1780,7 +1780,32 @@ async def subir_documento(
         }
         mime_type = mimetype_map.get(file_ext, 'application/octet-stream')
         
-        timestamp_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{archivo.filename}"
+        # ✅ NUEVO: LÓGICA DE RENOMBRADO AUTOMÁTICO
+        import string
+        import re
+        
+        # Nombre base seguro (eliminar acentos y especiales del tipo_documento)
+        tipo_seguro = re.sub(r'[^a-zA-Z0-9_\-]', '', str(tipo_documento).upper())
+        
+        # Obtener ID Cliente (o usar el ID del sistema si no tiene ID Cliente asignado)
+        id_cli = str(prospecto.id_cliente).replace(" ", "") if prospecto.id_cliente else f"PROS-{prospecto_id}"
+        
+        # Determinar si incluimos ID de cotizacion (si es una cotización y tiene una)
+        id_cot_str = ""
+        # NOTA: En este punto, si es una NUEVA cotización, todavía no se ha generado su ID en bd
+        # por lo que el nombre tomará el ID de la cotización *anterior* si la hay, o no lo tendrá.
+        # Pero eso es aceptable para no romper la inserción.
+        if tipo_documento == "cotizacion" and prospecto.id_cotizacion:
+             id_cot_str = f"_{prospecto.id_cotizacion}"
+             
+        fecha_str = datetime.now().strftime('%Y%m%d%H%M')
+        
+        # Ensamblar: TIPO_IDCLI_IDCOT_FECHA.ext
+        nombre_final = f"{tipo_seguro}_{id_cli}{id_cot_str}_{fecha_str}{file_ext}"
+        timestamp_name = nombre_final
+        
+        # Actualizamos también el nombre_archivo que va a BD guardado para reflejarlo localmente
+        archivo.filename = timestamp_name
         
         # Subir a Drive. Devuelve el ID del archivo (ej: '1B2a_xY...')
         drive_file_id = upload_to_drive(file_content_compressed, timestamp_name, mime_type, folder_id)
@@ -1888,6 +1913,62 @@ async def subir_documento(
             url=f"/prospectos/{prospecto_id}/seguimiento?error=Error al subir documento", 
             status_code=303
         )
+
+# ✅ NUEVO ENDPOINT: Borrar documento
+@app.post("/documentos/{documento_id}/borrar")
+async def borrar_documento(
+    request: Request,
+    documento_id: int,
+    db: Session = Depends(database.get_db)
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/", status_code=303)
+        
+    # Solo ADMIN o SUPERVISOR pueden borrar documentos
+    if user.tipo_usuario not in [TipoUsuario.ADMIN.value, TipoUsuario.SUPERVISOR.value]:
+        return RedirectResponse(url="/prospectos?error=No tiene permisos para borrar documentos", status_code=303)
+        
+    documento = db.query(models.Documento).filter(models.Documento.id == documento_id).first()
+    if not documento:
+        return RedirectResponse(url="/prospectos?error=Documento no encontrado", status_code=303)
+        
+    prospecto_id = documento.prospecto_id
+    prospecto_estado = db.query(models.Prospecto.estado).filter(models.Prospecto.id == prospecto_id).scalar()
+    
+    # Borrar de Drive si aplica
+    if documento.ruta_archivo and documento.ruta_archivo.startswith("gdrive://"):
+        file_id = documento.ruta_archivo.replace("gdrive://", "")
+        from services.google_drive import delete_from_drive
+        delete_from_drive(file_id)
+    else:
+        # Intentar borrar localmente
+        try:
+            ruta_local = os.path.join(UPLOAD_DIR, documento.ruta_archivo)
+            if os.path.exists(ruta_local):
+                os.remove(ruta_local)
+        except Exception as e:
+            print(f"Error borrando archivo local: {e}")
+            
+    # Registrar la interacción (Traza)
+    interaccion_borrado = models.Interaccion(
+        prospecto_id=prospecto_id,
+        usuario_id=user.id,
+        tipo_interaccion="documento",
+        descripcion=f"Documento eliminado: {documento.nombre_archivo} ({documento.tipo_documento})",
+        estado_anterior=prospecto_estado,
+        estado_nuevo=prospecto_estado
+    )
+    db.add(interaccion_borrado)
+    
+    # Eliminar de la base de datos
+    db.delete(documento)
+    db.commit()
+    
+    return RedirectResponse(
+        url=f"/prospectos/{prospecto_id}/seguimiento?success=Documento eliminado correctamente", 
+        status_code=303
+    )
 
 # ✅ NUEVO ENDPOINT: Descargar documento desde Google Drive
 @app.get("/documentos/{documento_id}/descargar")

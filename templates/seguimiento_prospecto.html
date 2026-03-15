@@ -230,10 +230,16 @@
                         </div>
                         {% if documento.ruta_archivo.startswith('gdrive://') %}
                         <a href="/documentos/{{ documento.id }}/descargar" target="_blank"
-                            class="btn btn-sm btn-light text-primary rounded-circle" title="Ver en Google Drive"><i class="fab fa-google-drive"></i></a>
+                            class="btn btn-sm btn-light text-primary rounded-circle ms-1" title="Ver en Google Drive"><i class="fab fa-google-drive"></i></a>
                         {% else %}
                         <a href="/{{ documento.ruta_archivo }}" target="_blank"
-                            class="btn btn-sm btn-light text-primary rounded-circle" title="Descargar archivo local"><i class="fas fa-download"></i></a>
+                            class="btn btn-sm btn-light text-primary rounded-circle ms-1" title="Descargar archivo local"><i class="fas fa-download"></i></a>
+                        {% endif %}
+                        
+                        {% if current_user.tipo_usuario in ['admin', 'supervisor'] %}
+                        <form action="/documentos/{{ documento.id }}/borrar" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este documento de forma permanente? Esta acción no se puede deshacer.');">
+                            <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle ms-1" title="Eliminar documento"><i class="fas fa-trash-alt"></i></button>
+                        </form>
                         {% endif %}
                     </div>
                     {% endfor %}
